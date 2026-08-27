@@ -6,7 +6,7 @@
 import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -23,7 +23,7 @@ const run = (cmd) => new Promise((res) => { exec(cmd, (e, so, se) => res({ e, so
 async function startServer() {
   cp = spawn(process.execPath, ['server/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(PORT), DB_PATH, SEED_DEMO: 'true', OUTBOX_INTERVAL_MS: '800', LOG_LEVEL: 'warn', RATE_LIMIT_ENABLED: 'false' },
+    env: { ...process.env, PORT: String(PORT), DB_PATH, SEED_DEMO: 'true', OUTBOX_INTERVAL_MS: '800', LOG_LEVEL: 'warn', RATE_LIMIT_ENABLED: 'false', STRIPE_WEBHOOK_SECRET: 'e2e-webhook-secret' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   cp.stdout.on('data', (d) => log.push(String(d)));
@@ -382,5 +382,22 @@ describe('Regresión — onboarding de negocio', () => {
     assert.equal(me.json.user.email, email);
     assert.equal(me.json.user.role, 'owner');
     assert.ok(me.json.user.permissions.includes('venue.manage'));
+  });
+});
+
+describe('Pagos — webhook firmado y conciliación', () => {
+  test('rechaza firma inválida y procesa evento Stripe de forma idempotente', async () => {
+    const event = { id: `evt_e2e_${Date.now()}`, type: 'payment_intent.succeeded', data: { object: { id: 'pi_missing_e2e' } } };
+    const payload = JSON.stringify(event);
+    const bad = await fetch(`${BASE}/webhooks/stripe`, { method: 'POST', headers: { 'content-type': 'application/json', 'stripe-signature': 't=1,v1=bad' }, body: payload });
+    assert.equal(bad.status, 400);
+    const t = Math.floor(Date.now() / 1000);
+    const sig = createHmac('sha256', 'e2e-webhook-secret').update(`${t}.${payload}`).digest('hex');
+    const headers = { 'content-type': 'application/json', 'stripe-signature': `t=${t},v1=${sig}` };
+    const first = await fetch(`${BASE}/webhooks/stripe`, { method: 'POST', headers, body: payload });
+    assert.equal(first.status, 200);
+    const second = await fetch(`${BASE}/webhooks/stripe`, { method: 'POST', headers, body: payload });
+    assert.equal(second.status, 200);
+    assert.equal((await second.json()).data.duplicate, true);
   });
 });

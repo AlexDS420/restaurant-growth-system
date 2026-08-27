@@ -10,6 +10,10 @@ git clone <repo> restaurant-os && cd restaurant-os
 cp .env.example .env
 ```
 
+El repositorio incluye `package-lock.json`; en CI y producción se usa `npm ci` para
+reproducir exactamente el árbol declarado. No se deben subir `.env`, `data/*.db` ni
+credenciales al repositorio.
+
 Variables disponibles (`.env`):
 
 | Variable | Default | Descripción |
@@ -69,3 +73,35 @@ Procedimiento completo en `docs/runbook-rollback.md`:
 | `SQLITE_BUSY` en backups | Server escribiendo | `sqlite3 data/restaurant-os.db "PRAGMA wal_checkpoint(TRUNCATE);"` o pausar escrituras |
 | Pedidos no llegan a la comanda (5 s) | Polling del board | Revisar consola del admin (red/HTTP) |
 | `429 RATE_LIMITED` en demo | Rate limit por IP | Esperar la ventana o `RATE_LIMIT_ENABLED=false` (solo desarrollo/tests) |
+
+## 8. Despliegue persistente con Docker + nginx
+
+El runtime completo no es un sitio estático: necesita Node persistente para la API,
+sesiones y worker de outbox, además de un volumen persistente para SQLite. El
+`docker-compose.yml` levanta ambos servicios y nginx actúa únicamente como reverse
+proxy; no se publica `public/` directamente.
+
+```bash
+cp .env.example .env
+# Editar .env con valores de producción fuera del repositorio.
+docker compose build
+docker compose up -d
+docker compose ps
+curl -fsS http://localhost/nginx-health
+curl -fsS http://localhost/api/v1/healthz
+curl -fsS http://localhost/api/v1/readyz
+```
+
+La aplicación escucha internamente en `app:3000`. SQLite vive en el volumen
+`restaurant_data`; respáldalo con una tarea de backup del volumen. Antes de una nueva
+versión: ejecutar backup, `docker compose build`, `docker compose up -d` y verificar
+`readyz` antes de enrutar tráfico.
+
+En producción nginx debe terminar TLS (o estar detrás de un balanceador TLS),
+restringir el acceso administrativo y enviar `X-Forwarded-For` solo desde proxies
+confiables. `TRUST_PROXY=true` solo es correcto en esa topología; nunca expongas el
+puerto 3000 directamente a Internet.
+
+`SIGTERM`/`SIGINT` detienen el worker de outbox, marcan el servicio como no listo,
+cierran el listener HTTP y cierran SQLite de forma ordenada. `readyz` es el endpoint
+para readiness de orquestadores; `healthz` comprueba liveness y la conexión de base.

@@ -6,7 +6,7 @@ Fecha de verificación: 2026-08-27. Alcance: aplicación local completa en `app/
 
 La aplicación queda **PASÓ en local** para sus flujos E2E y para la matriz visual móvil/escritorio ejecutada. Se corrigieron un fallo de arranque en rutas con espacios, un registro que invertía hash/rol, vínculos de opciones del menú, controles de sesión/formularios y cinco brechas de seguridad de alto impacto.
 
-El sistema **NO debe declararse PRODUCTION_READY** todavía: usa pagos mock, no tiene lock de dependencias para `npm audit`, y la publicación estática mediante nginx no puede servir el backend Node/SQLite.
+El sistema **NO debe declararse PRODUCTION_READY** todavía: Stripe y sus secretos deben configurarse en el entorno real, y la publicación estática mediante nginx no puede servir el backend Node/SQLite.
 
 ## Cómo funciona
 
@@ -30,6 +30,10 @@ El sistema **NO debe declararse PRODUCTION_READY** todavía: usa pagos mock, no 
 
 También se añadieron cabeceras de seguridad, `Cache-Control: no-store` para API, validación de URI/JSON y normalización de correo en onboarding.
 
+### Pagos, webhooks y conciliación
+
+El adaptador ahora soporta `PAYMENTS_MODE=stripe` con PaymentIntents y refunds vía API HTTPS, manteniendo el mock únicamente para desarrollo/pruebas. El endpoint `/api/v1/webhooks/stripe` valida la firma HMAC compatible con `t=...,v1=...`, rechaza timestamps fuera de tolerancia, registra `provider_event_id` único y procesa eventos de forma idempotente. `/reconciliation` expone discrepancias entre pagos y estado de órdenes para roles autorizados. La integración real requiere `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y configuración de Stripe en producción; esas credenciales no se inventaron ni se almacenan en el repositorio.
+
 ## UI/UX y accesibilidad
 
 Se aplicó una dirección visual operativa (“pase de cocina”): fondo porcelana, verde pino, señal saffron y tipografía condensada para jerarquía rápida. Se eliminaron transiciones globales, se añadieron estados de foco visibles, skip links, navegación semántica y soporte de movimiento reducido. La revisión siguió las reglas de [Vercel Web Interface Guidelines](https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md).
@@ -49,7 +53,8 @@ Evidencia visual: [storefront-mobile-after.png](audit-assets/after/storefront-mo
 
 **PASÓ**
 
-- `npm test`: 25 pruebas, 25 pass, 0 fail, 0 cancelled.
+- `npm ci`: árbol reproducible y `npm audit` sin vulnerabilidades conocidas.
+- `npm test`: 26 pruebas, 26 pass, 0 fail, 0 cancelled.
 - `node --check` en módulos de servidor y frontend modificados.
 - Playwright Chromium: búsqueda `cev`, quick-add, carrito, checkout, validación de pago, login, navegación del panel y ausencia de errores de página.
 - Matriz móvil 375 px y escritorio 1440 px sin overflow horizontal.
@@ -57,13 +62,11 @@ Evidencia visual: [storefront-mobile-after.png](audit-assets/after/storefront-mo
 
 **NO EJECUTADO / LIMITACIONES**
 
-- `npm audit`: no ejecutable porque el proyecto no tiene `package-lock.json` ni dependencias npm instaladas.
 - Publicación AutoClaw/nginx: no ejecutada y no verificada; el skill adaptado solo prepara sitios estáticos. Este sistema necesita Node persistente y SQLite, por lo que no es un artefacto estático válido.
-- Los pagos siguen siendo mock; no hay evidencia de proveedor real, webhooks firmados ni conciliación bancaria.
+- Stripe real: código y contrato verificados localmente, pero configuración de cuenta, secretos, HTTPS público y eventos del proveedor quedan por ejecutar en el entorno productivo.
 - Persisten campos dinámicos secundarios del panel con cobertura WCAG incompleta; quedan como backlog P2 para una pasada dedicada.
 - No existe endpoint de auto-registro de clientes; se retiró el CTA engañoso que llamaba al registro de negocios.
 
 ## Skills AutoClaw disponibles en Codex
 
 El skill original de AutoClaw fue adaptado a `.agents/skills/fc-nginx-website/SKILL.md`, inventariado en `SKILLS.md` y validado. Puede invocarse como `$fc-nginx-website` en el siguiente ciclo de descubrimiento. La adaptación conserva límites estáticos y marca cualquier publicación AutoClaw como NO EJECUTADA cuando no existe integración real.
-

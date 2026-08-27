@@ -91,6 +91,7 @@ export async function startServer({ port = config.port, seedDemo = config.seedDe
           chunks.push(c);
         }
         const raw = Buffer.concat(chunks).toString('utf8');
+        req.rawBody = raw;
         if (!raw) req.body = {};
         else {
           try { req.body = JSON.parse(raw); }

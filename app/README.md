@@ -14,7 +14,7 @@ SaaS multi-tenant de **comercio y operaciones para restaurantes** implementado a
 
 | Módulo | Alcance |
 |---|---|
-| **Comercio** | Storefront público (menú, opciones, promociones, cupones, zonas de delivery, carrito persistente), pedidos con precios **server-side**, pago mock seguro (solo last4 + marca; nunca el PAN), seguimiento en tiempo real, reseñas post-entrega |
+| **Comercio** | Storefront público (menú, opciones, promociones, cupones, zonas de delivery, carrito persistente), pedidos con precios **server-side**, pagos Stripe configurables (mock solo en desarrollo; nunca se almacena el PAN), webhooks firmados y conciliación, seguimiento en tiempo real, reseñas post-entrega |
 | **Operaciones** | Pedidos, comandas (board 3 columnas), menú, stock/inventario con movimientos, clientes (360° + notas), reservas, reseñas (puntos QR + enlaces Google), equipo, auditoría |
 | **Plataforma** | Multi-tenant (aislamiento por `venue_id`), RBAC (6 roles), entitlements Starter/Plus/Pro (server-side), plantillas de negocio (planes, facturas, checkout/cancelar/reintentar), analítica + CSV, notificaciones por outbox con reintentos, eventos de analítica |
 | **Seguridad** | scrypt (N=16384,r=8,p=1), sesiones con token sha256 en cookie httpOnly SameSite=Lax, rate limits, CSP/cabeceras defensivas, auditoría con actor+timestamp, sin secretos en el repo (ver `.env.example`) |
@@ -60,7 +60,7 @@ El doble cobro devuelve `409 PAYMENT_ALREADY_PROCESSED`. La tarjeta nunca se alm
 |---|---|
 | `npm start` | Inicia el servidor |
 | `npm run dev` | Servidor con watch |
-| `npm test` | Suite E2E (25 pruebas, incluye las 6 obligatorias del §39 y regresiones de onboarding/seguridad/HTTP) |
+| `npm test` | Suite E2E (26 pruebas, incluye las 6 obligatorias del §39 y regresiones de onboarding/seguridad/pagos/HTTP) |
 | `npm run seed` | Migraciones + datos demo |
 | `npm run backup` | Respaldo SQLite (WAL-safe) en `backups/` |
 | `npm run drill` | Ensayo despliegue/rollback en BD aislada |
@@ -95,7 +95,7 @@ Consulta [docs/arquitectura.md](docs/arquitectura.md) para el modelo de datos, l
 ## 7. Estado de la entrega y limitaciones conocidas
 
 - **Cobertura del blueprint:** 49/49 secciones trazadas en [docs/trazabilidad.md](docs/trazabilidad.md) (decisiones D-01…D-13 en [docs/registro-decisiones.md](docs/registro-decisiones.md)).
-- **Suite:** 25/25 en verde (`npm test`), detalle en [docs/informe-pruebas.md](docs/informe-pruebas.md) y auditoría en [docs/auditoria-optimizacion-uiux.md](docs/auditoria-optimizacion-uiux.md).
+- **Suite:** 26/26 en verde (`npm test`), detalle en [docs/informe-pruebas.md](docs/informe-pruebas.md) y auditoría en [docs/auditoria-optimizacion-uiux.md](docs/auditoria-optimizacion-uiux.md).
 - **Demo interactiva validada en navegador:** pedido real (Ceviche Clásico, S/ 33.04 con IGV) → pago → seguimiento → panel admin → transición Nuevo→Aceptado → auditoría con actor.
 - **Scripts operativos:** `scripts/backup.sh`, `scripts/rollback.sh` y `scripts/rehearsal.sh` implementados **sin comandos de borrado** (los `-wal/-shm` se archivan en `backups/quarantine/` y el ensayo usa `data/rehearsal-*.db` aislada); ensayo de despliegue/rollback ejecutado con éxito (integridad ok, pedidos intactos) — detalle en [docs/runbook-rollback.md](docs/runbook-rollback.md) y [docs/informe-pruebas.md](docs/informe-pruebas.md).
 - **Fuera de alcance (por blueprint/contrato):** POS/KDS físico, marketplaces, migración de datos reales, pasarelas reales y certificación PCI, verticales no-restaurante.

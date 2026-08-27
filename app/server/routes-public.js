@@ -4,6 +4,8 @@ import { createOrder, getOrderPublic, payOrder, submitReview, publicVenue, publi
 import { feature } from './entitlements.js';
 import { enqueueOutbox } from './notifications.js';
 import { secureToken } from './db.js';
+import { verifyWebhookSignature, webhookSecret } from './payments.js';
+import { withTxn, nowISO } from './db.js';
 
 export function registerPublicRoutes(app) {
   const { db } = app;
@@ -64,12 +66,40 @@ export function registerPublicRoutes(app) {
       if (!v) return sendError(res, 404, 'VENUE_NOT_FOUND', 'Negocio no encontrado.');
       if (!feature(db, v.id, 'payments.online.enabled')) return sendError(res, 403, 'PAYMENTS_DISABLED', 'El pago en línea no está disponible en tu plan.');
       const body = req.body || {};
-      const out = await payOrder(db, { venueId: v.id, publicToken: req.params.publicToken, cardLast4: String(body.card_last4 || '').slice(-4), cardBrand: body.card_brand || 'visa', ip: req.ip });
-      sendOk(res, out, 200);
+      const out = await payOrder(db, { venueId: v.id, publicToken: req.params.publicToken, cardLast4: String(body.card_last4 || '').slice(-4), cardBrand: body.card_brand || 'visa', paymentMethodId: body.payment_method_id, ip: req.ip });
+      sendOk(res, out, out.payment_status === 'requires_action' || out.payment_status === 'requires_confirmation' ? 202 : 200);
     } catch (e) {
       const h = { ...errToHttp(e), order: e.order };
       sendError(res, h.status, h.code, h.message);
     }
+  });
+
+  // Webhook Stripe: firma HMAC compatible con el esquema t=timestamp,v1=hex.
+  // El body debe conservarse byte a byte por el servidor/proxy para producción.
+  app.post('/api/v1/webhooks/stripe', (req, res) => {
+    const payload = req.rawBody || JSON.stringify(req.body || {});
+    if (!verifyWebhookSignature(payload, req.headers['stripe-signature'], webhookSecret())) return sendError(res, 400, 'INVALID_WEBHOOK_SIGNATURE', 'Firma de webhook inválida.');
+    const event = req.body || {};
+    if (!event.id || !event.type) return sendError(res, 400, 'INVALID_WEBHOOK', 'Evento de webhook incompleto.');
+    try {
+      const inserted = withTxn(db, () => {
+        const r = db.prepare(`INSERT OR IGNORE INTO payment_webhook_events (provider, provider_event_id, event_type, payload_json) VALUES ('stripe',?,?,?)`).run(event.id, event.type, payload);
+        if (!r.changes) return false;
+        const object = event.data?.object || {};
+        const externalRef = object.payment_intent || (String(event.type).startsWith('payment_intent.') ? object.id : null);
+        const payment = externalRef ? db.prepare('SELECT * FROM payments WHERE external_ref = ?').get(externalRef) : null;
+        if (payment && ['payment_intent.succeeded', 'charge.succeeded'].includes(event.type)) {
+          db.prepare("UPDATE payments SET status='succeeded', failure_code=NULL, updated_at=? WHERE id=?").run(nowISO(), payment.id);
+          db.prepare("UPDATE orders SET payment_status='paid', updated_at=? WHERE id=? AND payment_status != 'paid'").run(nowISO(), payment.order_id);
+        } else if (payment && ['payment_intent.payment_failed', 'charge.failed'].includes(event.type)) {
+          db.prepare("UPDATE payments SET status='failed', failure_code=?, updated_at=? WHERE id=? AND status='pending'").run(object.last_payment_error?.code || 'payment_failed', nowISO(), payment.id);
+          db.prepare("UPDATE orders SET payment_status='failed', updated_at=? WHERE id=? AND payment_status='pending'").run(nowISO(), payment.order_id);
+        }
+        db.prepare("UPDATE payment_webhook_events SET status='processed', processed_at=? WHERE provider='stripe' AND provider_event_id=?").run(nowISO(), event.id);
+        return true;
+      });
+      return sendOk(res, { received: true, duplicate: !inserted });
+    } catch (e) { return sendError(res, 500, 'WEBHOOK_PROCESSING_FAILED', 'No se pudo procesar el webhook.'); }
   });
 
   // reseña post-entrega (Google + comentario privado, sin gating)

@@ -5,10 +5,17 @@ import { feature, featuresOf, currentPlan, enforceCount, checkTrial } from './en
 import { transitionOrder, refundOrder, requestReview, orderPayload, apiError, errToHttp, apiMetrics } from './orders.js';
 import { enqueueOutbox, NOTIFICATION_TEMPLATES } from './notifications.js';
 import { config } from './config.js';
+import { reconcilePayments } from './payments.js';
 
 export function registerAppRoutes(app) {
   const { db } = app;
   const auth = (perm) => [requireAuth(db), requirePerm(db, perm)];
+
+  // Diferencias entre estado del proveedor y estado local; solo lectura para operación.
+  app.get('/api/v1/payments/reconciliation', auth('payments.read'), (req, res) => {
+    try { sendOk(res, { provider: process.env.PAYMENTS_MODE || 'mock', generated_at: nowISO(), mismatches: reconcilePayments(db, { venueId: req.user.venue_id }) }); }
+    catch (e) { const h = errToHttp(e); sendError(res, h.status, h.code, h.message); }
+  });
 
   // ---------- AUTH ----------
   app.post('/api/v1/auth/register', (req, res) => {

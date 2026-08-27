@@ -1,7 +1,7 @@
 // Restaurant OS — motor de pedidos (blueprint §16): secuencia de creación, máquina de estados, pagos, reembolsos
 import { withTxn, withTxnAsync, nowISO, audit, analyticsEvent, secureToken } from './db.js';
 import { feature, currentPlan, checkTrial } from './entitlements.js';
-import { paymentProvider, ProviderOutageError } from './payments.js';
+import { paymentProvider, paymentProviderName, ProviderOutageError } from './payments.js';
 import { enqueueOutbox } from './notifications.js';
 import { can } from './auth.js';
 
@@ -306,7 +306,7 @@ export function getOrderPublic(db, token) {
   return orderPayload(db, o);
 }
 
-export async function payOrder(db, { venueId, publicToken, cardLast4 = '4242', cardBrand = 'visa', ip }) {
+export async function payOrder(db, { venueId, publicToken, cardLast4 = '4242', cardBrand = 'visa', paymentMethodId, ip }) {
   const order = db.prepare('SELECT * FROM orders WHERE public_token = ? AND venue_id = ?').get(publicToken, venueId);
   if (!order) throw apiError(404, 'ORDER_NOT_FOUND', 'Pedido no encontrado.');
   if (order.status === 'cancelled') throw apiError(409, 'ORDER_CANCELLED', 'El pedido fue cancelado.');
@@ -314,12 +314,16 @@ export async function payOrder(db, { venueId, publicToken, cardLast4 = '4242', c
     const state = db.prepare(`SELECT status FROM payments WHERE order_id = ? ORDER BY id DESC LIMIT 1`).get(order.id);
     if (state?.status === 'succeeded') throw apiError(409, 'PAYMENT_ALREADY_PROCESSED', 'Este pedido ya fue pagado.');
     if (state?.status === 'pending') throw apiError(409, 'PAYMENT_IN_PROGRESS', 'Ya hay un pago en proceso para este pedido.');
-    const pr = db.prepare(`INSERT INTO payments (order_id, venue_id, amount_minor, status, provider, failure_code) VALUES (?,?,?,'pending','mock',NULL)`).run(order.id, venueId, order.total_minor);
+    const pr = db.prepare(`INSERT INTO payments (order_id, venue_id, amount_minor, status, provider, failure_code) VALUES (?,?,?,'pending',?,NULL)`).run(order.id, venueId, order.total_minor, paymentProviderName());
     apiMetrics.paymentAttempts++;
     return Number(pr.lastInsertRowid);
   });
   try {
-      const res = await paymentProvider.charge({ amountMinor: order.total_minor, currency: order.currency, cardLast4, cardBrand, orderRef: String(order.id) });
+      const res = await paymentProvider.charge({ amountMinor: order.total_minor, currency: order.currency, cardLast4, cardBrand, paymentMethodId, orderRef: String(order.id) });
+      if (res.status === 'requires_action' || res.status === 'requires_confirmation') {
+        // 3-D Secure: no marcar como fallido; el cliente continúa con Stripe.js.
+        return { order: orderPayload(db, order), payment_id: paymentId, payment_status: res.status, client_secret: res.clientSecret, external_ref: res.externalRef };
+      }
       withTxn(db, () => {
       db.prepare(`UPDATE payments SET status='succeeded', external_ref=?, updated_at=? WHERE id=?`).run(res.externalRef, nowISO(), paymentId);
       db.prepare(`UPDATE orders SET payment_status='paid', updated_at=? WHERE id=?`).run(nowISO(), order.id);
