@@ -25,7 +25,8 @@ export async function startServer({ port = config.port, seedDemo = config.seedDe
     await seed(db);
     console.log('[seed] datos demo creados');
   }
-  startOutboxWorker(db);
+  const outboxTimer = startOutboxWorker(db);
+  let ready = false;
 
   // --- router ---
   const routes = []; // [method, regex, keys, handler]
@@ -149,17 +150,44 @@ export async function startServer({ port = config.port, seedDemo = config.seedDe
       sendOk(res, { status: 'ok', time: nowISO(), uptime_s: Math.round(process.uptime()), env: config.env });
     } catch { sendError(res, 503, 'DEGRADED', 'Base de datos no disponible.'); }
   });
+  app.get('/api/v1/readyz', (_req, res) => {
+    if (!ready) return sendError(res, 503, 'NOT_READY', 'El servidor aún está iniciando.');
+    try {
+      db.prepare('SELECT 1').get();
+      sendOk(res, { status: 'ready', time: nowISO(), uptime_s: Math.round(process.uptime()) });
+    } catch { sendError(res, 503, 'DEGRADED', 'Base de datos no disponible.'); }
+  });
   app.get('/api/v1/metrics', (_req, res) => sendOk(res, apiMetrics.snapshot()));
 
   return new Promise((resolve) => {
     server.listen(port, () => {
+      ready = true;
       console.log(`[server] Restaurant OS escuchando en http://localhost:${port} (${config.env})`);
-      resolve({ server, db, app, port });
+      let closing;
+      const close = () => {
+        if (closing) return closing;
+        ready = false;
+        outboxTimer.stop?.();
+        closing = new Promise((done) => server.close(() => {
+          try { db.close(); } finally { done(); }
+        }));
+        return closing;
+      };
+      resolve({ server, db, app, port, close });
     });
   });
 }
 
 const isMain = Boolean(process.argv[1]) && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
-  startServer().catch((e) => { console.error('[server] error de arranque:', e); process.exit(1); });
+  let instance;
+  const shutdown = async (signal) => {
+    console.log(`[server] ${signal}: cerrando conexiones...`);
+    try { await instance?.close?.(); process.exit(0); }
+    catch (e) { console.error('[server] error al cerrar:', e.message); process.exit(1); }
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  startServer().then((running) => { instance = running; })
+    .catch((e) => { console.error('[server] error de arranque:', e); process.exit(1); });
 }

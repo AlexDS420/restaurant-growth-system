@@ -59,5 +59,7 @@ export function startOutboxWorker(db, { onFailed } = {}) {
   run();
   const timer = setInterval(run, config.outboxIntervalMs);
   timer.unref?.();
+  // El proceso de producción debe poder drenar y cerrar el worker limpiamente.
+  timer.stop = () => clearInterval(timer);
   return timer;
 }

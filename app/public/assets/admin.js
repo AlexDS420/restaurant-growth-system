@@ -46,6 +46,19 @@ function navHtml() {
     ${SECTIONS.filter(([id]) => state.me.user.permissions.includes(PERM[id])).map(([id, label]) => `<a href="?section=${id}" data-sec="${id}" ${state.sec === id ? 'class="active" aria-current="page"' : ''}>${label}</a>`).join('')}
   </nav><main class="main" id="main"></main></div>`;
 }
+// Fallback de accesibilidad para formularios renderizados dinámicamente:
+// garantiza nombre programático y una etiqueta anunciable aun en campos secundarios.
+function enhanceFormControls(root = document) {
+  root.querySelectorAll('input, select, textarea').forEach((control) => {
+    if (!control.name) control.name = control.id || `field-${Math.random().toString(36).slice(2, 8)}`;
+    const labelled = control.id && root.querySelector(`label[for="${CSS.escape(control.id)}"]`);
+    if (!labelled && !control.getAttribute('aria-label') && !control.getAttribute('aria-labelledby')) {
+      const wrapperLabel = control.closest('label');
+      const text = wrapperLabel?.textContent?.trim() || control.getAttribute('placeholder') || control.name;
+      control.setAttribute('aria-label', text.replace(/\s+/g, ' ').trim());
+    }
+  });
+}
 function go(sec, { replace = false } = {}) {
   if (comandaTimer && sec !== 'comanda') { clearInterval(comandaTimer); comandaTimer = null; }
   state.sec = sec;
@@ -55,7 +68,7 @@ function go(sec, { replace = false } = {}) {
   $('#view').innerHTML = navHtml();
   $('#view').querySelectorAll('[data-sec]').forEach((a) => a.onclick = (e) => { e.preventDefault(); go(a.dataset.sec); });
   const fn = { hoy: rHoy, pedidos: rPedidos, comanda: rComanda, menu: rMenu, inventario: rInventario, clientes: rClientes, reservas: rReservas, reseñas: rReseñas, analitica: rAnalitica, promociones: rPromos, cupones: rCupones, facturacion: rBilling, equipo: rEquipo, auditoria: rAuditoria, config: rConfig }[sec];
-  fn?.().catch((e) => {
+  fn?.().then(() => enhanceFormControls()).catch((e) => {
     if (e.code === 'FORBIDDEN' || e.code === 'AUTH_REQUIRED') { go('hoy', { replace: true }); return; }
     main().innerHTML = `<div class="error-state" role="alert"><div class="ico">⚠️</div><h2>No se pudo cargar esta sección</h2><p>${esc(e.message || esPE.errors.generic)}</p><button class="btn" id="retry-section">Intentar nuevamente</button></div>`;
     el('retry-section').onclick = () => go(sec, { replace: true });
@@ -522,6 +535,7 @@ function renderLogin() {
   el('tab-login').onclick = () => { state._reg = false; authForm(); };
   el('tab-reg').onclick = () => { state._reg = true; authForm(); };
   state._reg = false; authForm();
+  enhanceFormControls();
 }
 function authForm() {
   el('tab-login').classList.toggle('btn-ghost', state._reg);
