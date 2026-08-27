@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe Fase 0 — Auditoría PRD Master V1.0 · Restaurant OS</title>
+<style>
+  /* 03 Information Architects — contenido primero, fuentes de sistema, enlaces clásicos */
+  html { color-scheme: light; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.55; color: #111; background: #fff;
+    margin: 0; padding: 0;
+  }
+  main { max-width: 72ch; margin: 0 auto; padding: 3rem 1.4rem 5rem; }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 600; line-height: 1.25; color: #000; }
+  h1 { font-size: 2rem; margin: 0 0 .4rem; }
+  h2 { font-size: 1.4rem; margin: 2.6rem 0 .7rem; padding-bottom: .25rem; border-bottom: 2px solid #000; }
+  h3 { font-size: 1.1rem; margin: 1.6rem 0 .5rem; }
+  p { margin: .6rem 0; }
+  a { color: #0000EE; text-decoration: underline; }
+  a:visited { color: #551A8B; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .86em; }
+  code { background: #f5f5f5; padding: .1em .3em; border-radius: 3px; }
+  pre { background: #f8f8f8; border: 1px solid #ddd; padding: .8rem 1rem; overflow-x: auto; line-height: 1.4; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92em; }
+  th, td { border: 1px solid #bbb; padding: .45rem .6rem; vertical-align: top; text-align: left; }
+  th { background: #f0f0f0; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .meta { color: #333; font-size: .92em; margin: 0 0 1.6rem; }
+  .meta b { color: #000; }
+  .verdict { border: 2px solid #000; padding: 1rem 1.2rem; margin: 1.4rem 0; background: #fafaf5; }
+  .verdict h3 { margin-top: 0; }
+  .ok { color: #0a6b2d; font-weight: 600; }
+  .part { color: #8a5a00; font-weight: 600; }
+  .no { color: #a00; font-weight: 600; }
+  .small { font-size: .85em; color: #333; }
+  ul { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
+  li { margin: .25rem 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } main { padding: 1.6rem 1rem 4rem; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Informe Fase 0 — Auditoría y brecha</h1>
+<p><strong>Restaurant OS</strong> vs <strong>PRD Master V1.0 — Plataforma Gastronómica SaaS para Perú</strong></p>
+<p class="meta">
+Fecha: 25 de agosto de 2026 · Zona horaria: America/Lima<br>
+PRD auditado: v1.0 · 62 secciones · 3&nbsp;378 líneas · 40&nbsp;234 bytes · SHA-256 <code>ba5a7ce5…8f613</code><br>
+Repo: <code>restaurant-os/</code> (Node.js 24, node:sqlite, cero dependencias) · Suite: <b>23 tests · 23 PASS · 0 FAIL</b><br>
+Método: auditoría binaria (backend, frontend, pruebas) → gap analysis §33-36 → refactor selectivo → migración progresiva · sin reescritura
+</p>
+
+<h2>1. Resumen ejecutivo</h2>
+<p>Se ejecutó la Fase 0 del PRD Master V1.0 sobre la entrega Restaurant OS: tres auditorías en paralelo (backend/modelo de datos, frontend/UI, pruebas y gobernanza), mapeo completo de la matriz de capacidades (§33), verificación independiente con sandbox aislado y smoke en vivo, y corrección de los hallazgos clasificados como P0/seguridad. Resultado: la base entregada es <b>sólida y no amerita reescritura</b> (0 ítems REPLACE). De 85 capacidades evaluadas: <b>17 completas, 50 parciales y 18 inexistentes</b>; 27 requieren prioridad P0 para el piloto, pero los defectos de seguridad críticos ya fueron corregidos y cubiertos por pruebas de regresión.</p>
+
+<div class="verdict">
+<h3>Veredicto</h3>
+<p><b>APTO para continuar a la Fase 1 del roadmap</b>, con dos condicionantes: (a) definir RPO/RTO y poda de respaldos; (b) declarar explícitamente en la trazabilidad la exclusión o el hito de los E2E-004 (mesa→cuenta→pago) y E2E-006 (boleta/factura).</p>
+</div>
+
+<h2>2. Metodología y evidencia</h2>
+<p>El PRD prescribe (§0, §33-36) una ruta de auditoría → matriz funcional → análisis de brecha → refactor selectivo → migración progresiva; esta ejecución la respeta íntegramente:</p>
+<ul>
+  <li><b>Ronda 1 — tres auditores paralelos:</b> backend y modelo de datos; frontend y UI; pruebas y gobernanza. Cada uno produjo informe con evidencia archivo:línea.</li>
+  <li><b>Ronda 2 — mapeador de la matriz:</b> 85 filas Funcionalidad × Estado × Qué falta × Refactor × Prioridad (archivo <a href="#artefactos">matriz-prd.md</a>), con roadmap de 5 fases.</li>
+  <li><b>Sandbox aislado:</b> copia limpia sin datos reales ni git, puerto 3199, base <code>sandbox.db</code>; seed y suite en 0 dependencias; smoke HTTP en vivo (healthz, login, RBAC 403, menú público cross-tenant, auditoría con actor).</li>
+  <li><b>Verificación independiente:</b> cada hallazgo P0 fue confirmado en código por el orquestador antes de corregir, y cada corrección quedó cubierta por una prueba de regresión nueva (suite pasó de 21 a 23 tests).</li>
+</ul>
+
+<h2>3. Hallazgos de seguridad corregidos (P0)</h2>
+<table>
+<tr><th>#</th><th>Hallazgo</th><th>Severidad</th><th>Corrección</th><th>Regresión</th></tr>
+<tr><td>1</td><td>Backdoor <code>skipEntitlement</code> en el pago: un cliente anónimo podía enviar <code>skipEntitlement:true</code> y eludir el entitlement de pagos en línea (<code>routes-public.js:65</code>)</td><td class="no">ALTA</td><td>Flag eliminado; gate estricto por feature + única excepción del venue seed de demo</td><td>403 <code>PAYMENTS_DISABLED</code> aunque se envíe el flag</td></tr>
+<tr><td>2</td><td>Fuga cross-tenant en <code>GET /me/orders</code>: filtraba por email/teléfono sin acotar <code>venue_id</code> (§10/§42)</td><td class="no">ALTA</td><td><code>WHERE o.venue_id = ? AND (c.email = ? OR c.normalized_phone = ?)</code></td><td>Sin fuga + el dueño sí ve sus pedidos</td></tr>
+<tr><td>3</td><td><code>events/batch</code> aceptaba <code>venue_id</code> arbitrario del cliente; el storefront ni siquiera enviaba identificador (eventos de menú descartados)</td><td class="part">MEDIA</td><td><code>venue_slug</code> resuelto en servidor (id aceptado por compatibilidad), tope 200 eventos/lote, validaciones de longitud</td><td>Funnel trazable (slug + sesión persistente en localStorage)</td></tr>
+<tr><td>4</td><td><b>Bug crítico de producción:</b> el INSERT de <code>users</code> en el registro tenía parámetros desalineados (<code>password_hash</code> recibía <code>'owner'</code>; <code>role</code> recibía el hash) → CHECK violado → <b>todo autoregistro fallaba con 500</b> (E2E-001 del PRD)</td><td class="no">ALTA</td><td>Valores alineados <code>(?,?,?,?,?, 'owner')</code></td><td>Registro verificado por HTTP: 201 + sesión + venue trial Pro</td></tr>
+<tr><td>5</td><td><code>me/orders</code> consultaba la columna inexistente <code>o.order_number</code> → endpoint roto para todos</td><td class="no">ALTA</td><td><code>o.id AS order_number</code> (mismo patrón que el panel admin)</td><td>GET /me/orders responde 200</td></tr>
+</table>
+<p class="small">Trazabilidad completa de los cinco fixes con antes/después en <a href="#artefactos">fixes-p0.md</a>. Ninguna de las correcciones introdujo dependencias; la demo (<code>data/demo.db</code>, puerto 3100) no fue modificada (solo lecturas).</p>
+
+<h2>4. Matriz de capacidades §33 — resumen</h2>
+<p>Matriz completa (85 filas con PRD ref, estado, qué falta y refactor sugerido): <a href="#artefactos">matriz-prd.md</a>.</p>
+<h3>Por estado</h3>
+<table>
+<tr><th>Sección</th><th>COMPLETO</th><th>PARCIAL</th><th>NO EXISTE</th><th>Total</th></tr>
+<tr><td>A. Modelo + entidades (§9/§10)</td><td>4</td><td>7</td><td>3</td><td>14</td></tr>
+<tr><td>B. Módulos backend M01-M54</td><td>7</td><td>23</td><td>9</td><td>39</td></tr>
+<tr><td>C. UI (§7-8, §20-23)</td><td>4</td><td>11</td><td>5</td><td>20</td></tr>
+<tr><td>D. Transversal (§10, §15-16, §40-43, §51-54, §56)</td><td>2</td><td>9</td><td>1</td><td>12</td></tr>
+<tr><td><b>Total</b></td><td><b>17 (20 %)</b></td><td><b>50 (59 %)</b></td><td><b>18 (21 %)</b></td><td><b>85</b></td></tr>
+</table>
+<p class="small">De los 50 PARCIAL, la mayoría es IMPROVE sobre base sólida; solo 5 requieren REFACTOR (M01, M15, M23, M45/M46), todos con núcleo aprovechable. 0 REPLACE, conforme a la jerarquía §33 (KEEP &gt; IMPROVE &gt; REFACTOR &gt; REPLACE).</p>
+<h3>Por prioridad (§47)</h3>
+<table>
+<tr><th>Prioridad</th><th>Filas</th><th>Contenido</th></tr>
+<tr><td><b>P0</b> — crítico piloto / seguridad</td><td>27</td><td>Autenticación, QR, checkout modalidad mesa, eje de producción, KDS con SLA, pagos/pasarela, caja, multitenant, seguridad web, webhooks, pruebas (E2E/aislamiento/idempotencia)</td></tr>
+<tr><td><b>P1</b> — core operación</td><td>37</td><td>Onboarding, importación de carta, modificadores, mesas/cuentas, WhatsApp, impresión, delivery, Yape/Plin, cupones, CRM, reservas, inventario, analítica, suscripciones, auditoría</td></tr>
+<tr><td><b>P2</b> — crecimiento</td><td>16</td><td>Personalización, pagos mixtos, promociones avanzadas, fidelización, notificaciones multicanal, fiscal (Fase Perú Pro), recetas/mermas/compras, soporte/libro de reclamaciones, privacidad</td></tr>
+<tr><td><b>P3</b> — pulido</td><td>5</td><td>Responsive fino, accesibilidad, timezone de presentación, soft delete completo, estética (ya cumple)</td></tr>
+</table>
+
+<h2>5. Brechas estructurales top (no corregidas por ser de producto, no defectos)</h2>
+<table>
+<tr><th>Capacidad</th><th>Estado</th><th>Hallazgo</th></tr>
+<tr><td>M09 — QR</td><td class="part">PARCIAL</td><td>Solo existe token de reseña (<code>/r/:token</code> → 302). No hay generación ni descarga de QR de menú/sucursal/mesa (grep qrcode = 0)</td></tr>
+<tr><td>M10/M11 — Mesas y cuentas abiertas</td><td class="no">NO EXISTE</td><td>Sin <code>dining_areas</code>/<code>tables</code>; el checkout solo soporta pickup/delivery</td></tr>
+<tr><td>M26 — Caja</td><td class="no">NO EXISTE</td><td>Sin apertura/cierre, esperado/declarado/diferencia, arqueo; el rol cajero no tiene pantalla propia</td></tr>
+<tr><td>M23/M25 — Pagos</td><td class="part">PARCIAL</td><td>Interfaz desacoplada y gate cerrado (validado), pero solo tarjeta mock: sin efectivo/Yape/Plin/transferencia ni pasarela real con webhook</td></tr>
+<tr><td>M15/M18 — Producción</td><td class="part">PARCIAL</td><td>KDS operable (polling, sonido, rol kitchen) pero sin estaciones, SLA/atrasados ni eje de estados waiting→in_progress→ready→served</td></tr>
+<tr><td>M20 — Impresión</td><td class="no">NO EXISTE</td><td>Sin comanda ni comprobante imprimibles</td></tr>
+<tr><td>M45-M47 — Multi-sucursal y permisos</td><td class="part">PARCIAL</td><td>RBAC hardcoded funcional y testeado (T6); sin tablas de membresías/perfiles ni multi-negocio real (1 usuario = 1 venue)</td></tr>
+<tr><td>§16 — Webhooks</td><td class="no">NO EXISTE</td><td>Cero endpoints entrantes; E2E-005 (pago→webhook) queda parcial</td></tr>
+<tr><td>M39 — Inventario</td><td class="part">PARCIAL</td><td>Movimientos con anti-negativo ✓, pero el pedido descuenta stock del producto, no inventario (<code>order_consume</code> nunca se inserta)</td></tr>
+<tr><td>§8 — Home (10 widgets)</td><td class="part">PARCIAL</td><td>3 de 10 widgets: faltan mesas ocupadas, resumen cocina, comparativa vs ayer, estado de caja, más vendido</td></tr>
+</table>
+
+<h2>6. Criterios de éxito del MVP (§56)</h2>
+<table>
+<tr><th>#</th><th>Criterio</th><th>Estado</th><th>Evidencia</th></tr>
+<tr><td>a</td><td>5 restaurantes configurables</td><td class="ok">✅</td><td>Seed crea 2 venues; <code>/auth/register</code> crea N con slug único y trial Pro (corregido en esta fase)</td></tr>
+<tr><td>b</td><td>QR generable</td><td class="part">◐</td><td>Solo QR de reseña; sin generación de QR de menú (único criterio parcial)</td></tr>
+<tr><td>c</td><td>Pedido sin asistencia</td><td class="ok">✅</td><td>Flujo público <code>/public/venues/:slug/orders</code> + seguimiento por token + rate limit</td></tr>
+<tr><td>d</td><td>Pedido llega a KDS</td><td class="ok">✅</td><td>Transiciones pending→accepted→preparing→ready→completed + RBAC + outbox de aviso</td></tr>
+<tr><td>e</td><td>Sin pérdida de pedidos</td><td class="ok">✅</td><td>Outbox transaccional + test T4 (notificador caído no pierde el pedido)</td></tr>
+<tr><td>f</td><td>Sin doble pago</td><td class="ok">✅</td><td><code>idempotency_key</code>/<code>external_ref</code> UNIQUE + 409 <code>PAYMENT_ALREADY_PROCESSED</code></td></tr>
+<tr><td>g</td><td>Aislamiento</td><td class="ok">✅</td><td>Test T1 + scoping por venue en consultas; fuga de <code>me/orders</code> cerrada con regresión</td></tr>
+<tr><td>h</td><td>Dashboard refleja ventas</td><td class="ok">✅</td><td><code>/analytics/summary</code> (ventas, pedidos, ticket promedio, top productos, por forma de pago)</td></tr>
+<tr><td>i</td><td>Monitoreo</td><td class="ok">✅</td><td><code>/api/v1/healthz</code> y <code>/api/v1/metrics</code> (order_count, latency p50/p95) verificados en vivo</td></tr>
+<tr><td>j</td><td>Backups</td><td class="ok">✅</td><td><code>scripts/backup.sh</code> con <code>sqlite3 .backup</code> y timestamp; evidencia de drill en <code>backups/</code></td></tr>
+</table>
+<p><b>Resultado: 8 ✅ · 1 ◐ · 0 ❌</b></p>
+
+<h2>7. E2E críticos (§41) vs suite actual</h2>
+<table>
+<tr><th>ID</th><th>Flujo</th><th>Cobertura</th></tr>
+<tr><td>E2E-001</td><td>Registro → negocio → menú</td><td class="part">PARCIAL — registro cubierto (y corregido); falta test de alta de menú tras registrar</td></tr>
+<tr><td>E2E-002</td><td>QR → producto → carrito → pedido</td><td class="part">PARCIAL — pedido y reseña por API ✓; sin QR de menú ni flujo carrito real</td></tr>
+<tr><td>E2E-003</td><td>Pedido → KDS → listo</td><td class="ok">✅ CUBIERTO por API (4 transiciones + RBAC kitchen)</td></tr>
+<tr><td>E2E-004</td><td>Mesa → cuenta → pago</td><td class="no">NO CUBIERTO — no existe modelo de mesas</td></tr>
+<tr><td>E2E-005</td><td>Pago online → webhook</td><td class="part">PARCIAL — pago mock cubierto (declina/outage/doble pago); sin webhook (grep = 0)</td></tr>
+<tr><td>E2E-006</td><td>Boleta / factura</td><td class="no">NO CUBIERTO — sin documento fiscal de ventas (coherente con D-06; pendiente de declarar en trazabilidad)</td></tr>
+</table>
+
+<h2>8. Roadmap de ejecución (§47) — 5 fases</h2>
+<table>
+<tr><th>Fase</th><th>Objetivo</th><th>Entregables clave</th></tr>
+<tr><td><b>F0</b> — Base segura (sem 1-2)</td><td>Blindar lo existente</td><td>Suite de aislamiento por tabla (§42 sistemático); E2E-001 completo; CSP + tokens CSRF; rotación de sesiones; backups automatizados + alerta de healthz; UNIQUE en <code>subscription_payments.external_ref</code>; definir RPO/RTO</td></tr>
+<tr><td><b>F1</b> — Piloto pedidos en línea (sem 3-5)</td><td>Operar la secuencia §58</td><td>QR general + descarga (M09); checkout canal mesa (M13); eje de producción + KDS con SLA (M15/M18); impresión de comanda/comprobante (M20); pagos efectivo/Yape/Plin + pasarela con webhook (M23-25/§16); caja apertura/cierre (M26 mín.)</td></tr>
+<tr><td><b>F2</b> — Operación local full (mes 2)</td><td>Restaurante físico y delivery</td><td>Mesas + cuentas abiertas (M10-11); inventario conectado (M39); delivery con radio (M21); reservas públicas (M30); roles en BD + multi-sucursal (M45-47); widgets restantes del home (M43/§8); E2E-004</td></tr>
+<tr><td><b>F3</b> — Crecimiento (mes 3)</td><td>Retención y soporte</td><td>Fidelización y segmentación (M34-35); promociones por horario/categoría (M28); notificaciones multicanal (M36); soporte (M51); KDS standalone; waitlist (M31)</td></tr>
+<tr><td><b>F4</b> — Perú Pro + pulido (mes 4+)</td><td>Fiscal y calidad final</td><td>Facturación electrónica (M37-38, §30); libro de reclamaciones (M53); webhooks SUNAT (§16); privacidad ARCO (M54); a11y y responsive finales; superadmin con KPIs (M50)</td></tr>
+</table>
+<p class="small">Criterio de salida F0→F1: suite verde (hoy 25/25), suite de aislamiento por tabla publicada y cero hallazgos P0 de seguridad abiertos.</p>
+
+<h2>9. Gobernanza y calidad de proceso</h2>
+<ul>
+  <li><b>Scripts no destructivos:</b> <code>grep -rn "rm |unlink|find .*delete" scripts/</code> → 0 coincidencias; rollback/rehearsal usan <code>mv</code> a <code>backups/quarantine/</code> (con evidencia física del ensayo real del 24-08).</li>
+  <li><b>.gitignore</b> cubre <code>data/*.db*</code>, <code>backups/</code>, <code>.env</code>, <code>*.log</code>.</li>
+  <li><b>Documentación alineada a la realidad</b> (3 discrepancias ALTA/MEDIA corregidas en esta fase): informe de pruebas 21→23; ruta <code>/api/v1/metrics</code>; nombres reales de métricas en operaciones.md (verificado por grep: 0 ocurrencias de los contadores Prometheus ficticios).</li>
+  <li><b>Pendientes de decisión de negocio:</b> RPO/RTO y poda de respaldos; el paso manual del runbook de rollback conserva un <code>rm</code> supervisado de archivos WAL (los scripts restaurados no lo usan; se recomienda migrarlo a cuarentena).</li>
+  <li><b>Observabilidad:</b> healthz + metrics JSON verificados en vivo; sin logger estructurado ni request-logging (quedó en F0/F1 del roadmap como mejora P1).</li>
+</ul>
+
+<h2>10. Supuestos y decisiones tomadas</h2>
+<ul>
+  <li>Se ejecutó el PRD como proceso (Fase 0), no como reescritura: <b>prohibido por §0/§33-36</b>; 0 líneas de features nuevas, solo corrección de defectos P0 y documentación.</li>
+  <li>El trabajo se realizó en <b>sandbox aislado</b> (puerto 3199, <code>sandbox.db</code>, copia sin git/datos/backups/.env); la demo en 3100 quedó intacta.</li>
+  <li>Los fixes P0 se aplicaron directamente al repo (refactor selectivo de la Fase 0) y quedaron protegidos por 2 pruebas de regresión nuevas.</li>
+  <li>Las correcciones documentales (informe 21→23, métricas, ruta) se aplicaron porque reflejan hechos verificados; RPO/RTO y trazabilidad de E2E-004/006 quedan como decisiones del dueño del producto.</li>
+  <li>Informe final en HTML (preset "03 Information Architects": contenido primero, fuentes de sistema, enlaces clásicos), con los artefactos fuente enlazados; no se generó DOCX por ausencia de convertidor en el entorno (el contenido completo está disponible en Markdown/HTML a partir de los 7 artefactos).</li>
+</ul>
+
+<h2 id="artefactos">11. Entregables y artefactos</h2>
+<p>Ruta raíz de la ejecución: <code>workspace/.cluster/restaurant-os/</code></p>
+<ul>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/plan.md">plan.md</a> — plan S1-S5 y criterios de verificación</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/audit-backend.md">audit-backend.md</a> — módulos M01-M54, modelo §9/§10, reglas §51-54</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/audit-frontend.md">audit-frontend.md</a> — UI §7/§8/§20-23, estética 11 Build</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/audit-tests.md">audit-tests.md</a> — pruebas §40-43, E2E-001..006, checklist MVP §56, gobernanza</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/matriz-prd.md">matriz-prd.md</a> — matriz §33 completa (85 filas) y roadmap 5 fases</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/fixes-p0.md">fixes-p0.md</a> — trazabilidad de los 5 fixes (antes/después + regresiones)</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/bitacora-ejecucion.md">bitacora-ejecucion.md</a> — registro de ejecución (hash, sandbox, smoke, sin efectos secundarios)</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/.cluster/restaurant-os/prd/review.md">review.md</a> — conciliación S4 y verificación independiente</li>
+  <li><a href="file:///Users/alexds/.openclaw-autoclaw/agents/restaurant-growth/workspace/restaurant-os/docs/informe-pruebas.md">docs/informe-pruebas.md</a> — actualizado a 25/25 y 50/50</li>
+</ul>
+
+<h2>12. Cierre</h2>
+<p>La Fase 0 del PRD concluye con la base existente blindada, la brecha frente a las 62 secciones del PRD cuantificada y priorizada (85 capacidades, 27 P0), y una hoja de ruta de 5 fases para llevar al piloto de 5-10 establecimientos (§57-58) desde pedidos en línea hasta la operación local completa y la fase fiscal peruana. El siguiente paso operativo es la ejecución de la <b>Fase 1 — Piloto pedidos en línea</b>, comenzando por QR, checkout con modalidad mesa y el eje de producción de pedidos.</p>
+
+<p class="small">Informe generado el 2026-08-25 (America/Lima) · Autoría: ejecución multi-agente (3 auditores, mapeador de matriz, verificación independiente) · Preset de estilo: 03 Information Architects</p>
+
+</main>
+</body>
+</html>

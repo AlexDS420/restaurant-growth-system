@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14231D">
+<title>Casa Aurora — Menú y pedidos en línea</title>
+<meta name="description" content="Pide directo desde el menú digital de Casa Aurora. Recojo o delivery en Miraflores, Lima.">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌻</text></svg>">
+</head>
+<body data-slug="casa-aurora">
+<a class="skip-link" href="#menu">Saltar al menú</a>
+<header class="nav"><div class="nav-inner">
+  <a class="brand" href="/">🌻 Casa Aurora</a><span class="nav-spacer"></span>
+  <a class="btn btn-ghost btn-sm" href="/account.html">Mi cuenta</a>
+</div></header>
+
+<main id="app">
+  <section class="section" id="hero"><div class="shell"><div class="skeleton" style="max-width:520px"></div><div class="skeleton" style="max-width:340px;margin-top:14px"></div></div></section>
+  <section class="section" style="padding-top:0"><div class="shell" id="menu"><div class="skeleton" style="height:90px;margin-bottom:12px"></div><div class="skeleton" style="height:90px;margin-bottom:12px"></div></div></section>
+</main>
+
+<div id="cartBar"></div>
+<div class="toast-wrap" role="status" aria-live="polite" aria-atomic="true"></div>
+<script type="module">
+import { api, toast, fmtMoney, modal, esc } from '/assets/ui.js';
+const slug = document.body.dataset.slug;
+const state = { venue: null, menu: null, cat: 'all', q: '', cart: JSON.parse(localStorage.getItem('ros_cart') || 'null'), order: null };
+
+const $ = (s) => document.querySelector(s);
+const cartCount = () => state.cart?.items?.reduce((a, i) => a + i.qty, 0) || 0;
+const cartTotal = () => state.cart?.items?.reduce((a, i) => a + i.qty * i.unit, 0) || 0;
+
+async function loadVenue() {
+  try {
+    state.venue = await api(`/public/venues/${slug}`);
+    document.title = `${state.venue.name} — Menú y pedidos en línea`;
+    localStorage.setItem('ros_venue', JSON.stringify({ id: state.venue.id, name: state.venue.name, slug }));
+    renderHero();
+    state.menu = await api(`/public/venues/${slug}/menu`);
+    validateCart();
+    renderMenu();
+    api('/events/batch', { method: 'POST', body: { events: [{ event_name: 'menu_viewed', actor_type: 'customer', properties: { page: 'menu' } }] } }).catch(() => {});
+  } catch (e) { $('#hero').innerHTML = `<div class="shell"><div class="error-state"><div class="ico">🍽️</div><p>${esc(e.message)}</p></div></div>`; }
+}
+
+function renderHero() {
+  const v = state.venue;
+  $('#hero').innerHTML = `<div class="shell">
+    <div class="split" style="align-items:flex-end">
+      <div>
+        <div class="row" style="gap:12px"><span style="font-size:44px">${v.logo_emoji || '🍽️'}</span>
+          <span class="badge ${v.is_open ? 'ok' : 'err'}">${v.is_open ? 'Abierto ahora' : 'Cerrado ahora'}</span></div>
+        <h1 style="margin:14px 0 6px">${esc(v.name)}</h1>
+        <p style="margin:0">${esc(v.tagline || (v.legal_name || ''))}</p>
+        <div class="row" style="margin-top:14px;color:var(--ink-60);font-size:13px">
+          <span>📍 ${esc(v.address || '')}, ${esc(v.district || '')}</span>
+          <span>· ${v.pickup_enabled ? 'Recojo' : ''}${v.pickup_enabled && v.delivery_enabled ? ' / ' : ''}${v.delivery_enabled ? 'Delivery' : ''}</span>
+        </div>
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        ${v.whatsapp ? `<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="https://wa.me/${v.whatsapp.replace(/\D/g, '')}">WhatsApp</a>` : ''}
+        ${v.instagram ? `<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="https://instagram.com/${v.instagram}">Instagram</a>` : ''}
+      </div>
+    </div></div>`;
+}
+
+function validateCart() {
+  if (!state.cart || state.cart.slug !== slug) { state.cart = { slug, items: [], ts: Date.now() }; saveCart(); return; }
+  const ids = new Set(state.menu.categories.flatMap((c) => c.products.map((p) => p.id)));
+  state.cart.items = state.cart.items.filter((i) => ids.has(i.product_id));
+  saveCart();
+}
+
+function productById(id) { for (const c of state.menu.categories) { const p = c.products.find((x) => x.id === Number(id)); if (p) return p; } return null; }
+
+function renderMenu() {
+  const cats = [{ id: 'all', name: 'Todo' }, ...state.menu.categories.filter((c) => c.products.length)];
+  $('#menu').innerHTML = `
+    <div class="row" style="margin-bottom:24px">
+      <div style="flex:1">
+        <label class="visually-hidden" for="q">Buscar platos</label>
+        <input class="input" id="q" name="menu_search" type="search" autocomplete="off" placeholder="Buscar platos…" value="${esc(state.q)}">
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:28px" id="cats" aria-label="Categorías del menú">
+      ${cats.map((c) => `<button class="btn btn-sm ${state.cat === c.id ? 'btn-accent' : 'btn-ghost'}" type="button" data-cat="${c.id}" aria-pressed="${state.cat === c.id}">${esc(c.name)}</button>`).join('')}
+    </div>
+    <div id="menu-results"></div>`;
+  $('#q').addEventListener('input', (e) => { state.q = e.currentTarget.value; renderMenuResults(); });
+  $('#cats').querySelectorAll('[data-cat]').forEach((button) => button.addEventListener('click', () => {
+    state.cat = button.dataset.cat;
+    $('#cats').querySelectorAll('[data-cat]').forEach((item) => {
+      const selected = item.dataset.cat === state.cat;
+      item.classList.toggle('btn-accent', selected);
+      item.classList.toggle('btn-ghost', !selected);
+      item.setAttribute('aria-pressed', String(selected));
+    });
+    renderMenuResults();
+  }));
+  renderMenuResults();
+}
+
+function renderMenuResults() {
+  const root = $('#menu-results');
+  if (!root || !state.menu) return;
+  const q = state.q.trim().toLowerCase();
+  root.innerHTML = `
+    ${state.menu.categories.filter((c) => state.cat === 'all' || c.id == state.cat).filter((c) => !q || c.products.some((p) => (p.name + ' ' + (p.description || '')).toLowerCase().includes(q))).map((c) => {
+      const prods = c.products.filter((p) => !q || (p.name + ' ' + (p.description || '')).toLowerCase().includes(q));
+      if (!prods.length) return '';
+      return `<div style="margin-bottom:40px"><h3 style="letter-spacing:.02em">${esc(c.name)}</h3>
+        <div class="grid grid-2" style="gap:14px;">${prods.map(productCard).join('')}</div></div>`;
+    }).join('') || emptyMenu()}`;
+  root.querySelectorAll('[data-prod]').forEach((button) => button.addEventListener('click', () => openProduct(button.dataset.prod)));
+  root.querySelectorAll('[data-add]').forEach((button) => button.addEventListener('click', () => addFromCard(button.dataset.add)));
+}
+
+function emptyMenu() { return `<div class="empty"><div class="ico">🔍</div><p>Sin resultados para tu búsqueda.</p></div>`; }
+
+function productCard(p) {
+  const inCart = state.cart.items.find((i) => i.product_id === p.id);
+  const price = p.promo_price_minor != null && p.promo_price_minor < p.price_minor ? p.promo_price_minor : p.price_minor;
+  const hasOptions = (p.option_group_ids || []).length > 0;
+  return `<article class="p-card">
+    <button class="p-card-main" type="button" data-prod="${p.id}" aria-label="Ver detalles de ${esc(p.name)}">
+      <span class="p-emoji" aria-hidden="true">${p.emoji || '🍽️'}</span>
+      <span class="p-info"><span style="display:block;font-weight:600;margin-bottom:2px">${esc(p.name)}</span><span class="desc">${esc((p.description || '').slice(0, 70))}</span></span>
+    </button>
+    <div style="text-align:right">
+      <div class="p-price">${fmtMoney(price)}${p.promo_price_minor != null && p.promo_price_minor < p.price_minor ? `<span class="old">${fmtMoney(p.price_minor)}</span>` : ''}</div>
+      <button class="btn btn-accent btn-sm p-add" type="button" data-add="${p.id}" aria-label="${hasOptions ? 'Elegir opciones de' : 'Agregar'} ${esc(p.name)}">${inCart ? `Agregado · ${inCart.qty}` : 'Agregar'}</button>
+    </div></article>`;
+}
+
+function addFromCard(pid) {
+  const p = productById(pid);
+  if (!p) return;
+  if ((p.option_group_ids || []).length) { openProduct(pid); return; }
+  addCartItem(p, { qty: 1, selected: [], notes: '' });
+  toast('Agregado al carrito', 'ok');
+}
+
+function addCartItem(p, { qty, selected, notes }) {
+  const found = state.cart.items.find((i) => i.product_id === p.id && JSON.stringify(i.option_ids || []) === JSON.stringify(selected));
+  if (found) found.qty += qty;
+  else state.cart.items.push({ product_id: p.id, name: p.name, emoji: p.emoji, unit: p.promo_price_minor != null && p.promo_price_minor < p.price_minor ? p.promo_price_minor : p.price_minor, qty, option_ids: selected, option_str: selected.map((s) => state.menu.option_groups.flatMap((g) => g.options).find((o) => o.id === s)?.name).filter(Boolean).join(', '), notes });
+  saveCart();
+  syncProductCartLabel(p.id);
+}
+
+function syncProductCartLabel(productId) {
+  const button = document.querySelector(`[data-add="${productId}"]`);
+  const p = productById(productId);
+  if (!button || !p) return;
+  const inCart = state.cart.items.find((i) => i.product_id === p.id);
+  button.textContent = inCart ? `Agregado · ${inCart.qty}` : 'Agregar';
+  button.setAttribute('aria-label', `${(p.option_group_ids || []).length ? 'Elegir opciones de' : 'Agregar'} ${p.name}`);
+}
+
+function openProduct(pid) {
+  const p = productById(pid);
+  if (!p) return;
+  const groups = (p.option_group_ids || []).map((gid) => state.menu.option_groups.find((g) => g.id === gid)).filter(Boolean);
+  const m = modal(`
+    <div class="row" style="gap:14px;align-items:flex-start">
+      <span style="font-size:44px">${p.emoji || '🍽️'}</span>
+      <div><h3 style="margin:0">${esc(p.name)}</h3><p class="muted" style="margin:6px 0 0">${esc(p.description || '')}</p></div>
+    </div>
+    <p class="p-price" style="font-size:20px;margin:14px 0">${fmtMoney(p.promo_price_minor != null && p.promo_price_minor < p.price_minor ? p.promo_price_minor : p.price_minor)}</p>
+    <form id="pform">
+      ${groups.map((g) => `<fieldset class="field" style="border:0;padding:0"><legend style="font-size:13px;font-weight:500;margin-bottom:6px">${esc(g.name)}${g.is_required ? ' (obligatorio)' : ''}</legend>
+        ${g.options.map((o) => `<label class="checkline" style="margin-bottom:6px"><input type="${g.selection_type === 'multiple' ? 'checkbox' : 'radio'}" name="opt-${g.id}" value="${o.id}"> <span>${esc(o.name)}</span> ${o.price_minor ? `<span class="muted">+${fmtMoney(o.price_minor)}</span>` : ''}</label>`).join('')}</fieldset>`).join('')}
+      <div class="field"><label for="pqty">Cantidad</label><input class="input" type="number" id="pqty" name="quantity" min="1" max="99" value="1" inputmode="numeric" autocomplete="off" required></div>
+      <div class="field"><label for="pnotes">Notas del producto</label><textarea class="input" id="pnotes" name="product_notes" autocomplete="off" placeholder="Ej. sin cebolla…"></textarea></div>
+      <button class="btn btn-accent btn-lg btn-block" type="submit" style="margin-top:8px">Agregar al carrito</button>
+    </form>`, { title: '' });
+  m.body.querySelector('#pform').onsubmit = (e) => {
+    e.preventDefault();
+    const selected = [];
+    for (const g of groups) {
+      const checked = [...m.body.querySelectorAll(`input[name="opt-${g.id}"]:checked`)].map((i) => Number(i.value));
+      if (g.is_required && !checked.length) return toast(`Selecciona: ${g.name}`, 'err');
+      if (checked.length < g.min_selections || checked.length > g.max_selections) return toast(`${g.name}: selecciona entre ${g.min_selections} y ${g.max_selections}.`, 'err');
+      selected.push(...checked);
+    }
+    const qty = Math.max(1, Number(m.body.querySelector('#pqty').value) || 1);
+    addCartItem(p, { qty, selected, notes: m.body.querySelector('#pnotes').value || '' });
+    m.close();
+    toast('Agregado al carrito', 'ok');
+  };
+}
+
+function saveCart() { localStorage.setItem('ros_cart', JSON.stringify({ ...state.cart, ts: Date.now() })); renderCartBar(); }
+function renderCartBar() {
+  const n = cartCount();
+  $('#cartBar').innerHTML = n ? `<div class="cart-bar"><div class="inner">
+    <button class="btn btn-ghost btn-sm" type="button" style="background:transparent;border-color:rgba(255,255,255,.25);color:#fff;min-width:96px" data-cart>Ver detalle</button>
+    <span style="flex:1;font-size:13px;opacity:.85">${n} artículo${n !== 1 ? 's' : ''}</span>
+    <span class="num" style="font-weight:600">${fmtMoney(cartTotal())}</span>
+    <button class="btn btn-accent btn-sm" type="button" data-checkout>Confirmar pedido</button>
+  </div></div>` : '';
+  $('#cartBar').querySelector('[data-cart]')?.addEventListener('click', openCart);
+  $('#cartBar').querySelector('[data-checkout]')?.addEventListener('click', openCheckout);
+}
+
+function openCart() {
+  const m = modal('<div id="cart-content"></div>', { title: 'Tu pedido' });
+  renderCartModal(m);
+}
+
+function renderCartModal(m, focusSelector = '') {
+  const content = m.body.querySelector('#cart-content');
+  content.innerHTML = state.cart.items.length ? `
+    <div aria-live="polite">
+      ${state.cart.items.map((i, index) => `<article class="split" style="padding:12px 0;border-bottom:1px solid var(--border);gap:16px;align-items:center">
+        <div style="min-width:0;flex:1">
+          <strong>${esc(i.name)}</strong>
+          <div class="muted" style="font-size:12px">${esc(i.option_str || '')}${i.option_str && i.notes ? ' · ' : ''}${i.notes ? esc(i.notes) : ''}</div>
+          <div class="qty-control" style="margin-top:8px" aria-label="Cantidad de ${esc(i.name)}">
+            <button class="btn btn-ghost btn-sm" type="button" data-cart-dec="${index}" aria-label="Reducir cantidad de ${esc(i.name)}">−</button>
+            <output class="num" aria-label="Cantidad">${i.qty}</output>
+            <button class="btn btn-ghost btn-sm" type="button" data-cart-inc="${index}" aria-label="Aumentar cantidad de ${esc(i.name)}">+</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" data-cart-remove="${index}" style="margin-top:8px" aria-label="Eliminar ${esc(i.name)} del pedido">Eliminar</button>
+        </div>
+        <span class="num">${fmtMoney(i.unit * i.qty)}</span>
+      </article>`).join('')}
+    </div>
+    <div class="split" style="margin-top:16px"><strong>Total</strong><strong class="num">${fmtMoney(cartTotal())}</strong></div>
+    <button class="btn btn-accent btn-lg btn-block" type="button" data-go style="margin-top:16px">Confirmar pedido</button>`
+    : `<div class="empty"><div class="ico" aria-hidden="true">🛒</div><p>Tu carrito está vacío</p></div>`;
+
+  const updateQuantity = (index, delta) => {
+    const item = state.cart.items[index];
+    if (!item) return;
+    item.qty = Math.max(1, item.qty + delta);
+    saveCart();
+    syncProductCartLabel(item.product_id);
+    const selector = delta > 0 ? `[data-cart-inc="${index}"]` : `[data-cart-dec="${index}"]`;
+    renderCartModal(m, selector);
+  };
+  content.querySelectorAll('[data-cart-dec]').forEach((button) => button.addEventListener('click', () => updateQuantity(Number(button.dataset.cartDec), -1)));
+  content.querySelectorAll('[data-cart-inc]').forEach((button) => button.addEventListener('click', () => updateQuantity(Number(button.dataset.cartInc), 1)));
+  content.querySelectorAll('[data-cart-remove]').forEach((button) => button.addEventListener('click', () => {
+    const index = Number(button.dataset.cartRemove);
+    const item = state.cart.items[index];
+    if (!item || !window.confirm(`¿Eliminar ${item.name} del pedido?`)) return;
+    const productId = item.product_id;
+    state.cart.items.splice(index, 1);
+    saveCart();
+    syncProductCartLabel(productId);
+    renderCartModal(m);
+    content.querySelector('[data-cart-remove], [data-go]')?.focus();
+  }));
+  content.querySelector('[data-go]')?.addEventListener('click', () => { m.close(); openCheckout(); });
+  if (focusSelector) content.querySelector(focusSelector)?.focus();
+}
+
+function openCheckout() {
+  const v = state.venue;
+  const m = modal(`
+    <h3>Confirmar pedido</h3>
+    <form id="co-form">
+      <div class="field"><label for="co-name">Nombre</label><input class="input" id="co-name" name="name" autocomplete="name" required></div>
+      <div class="field"><label for="co-phone">Teléfono</label><input class="input" id="co-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Ej. 999 999 999…" pattern="[0-9\\x20\\+\\(\\)\\-]{7,20}" required></div>
+      <div class="field"><label for="co-email">Correo (opcional)</label><input class="input" id="co-email" name="email" type="email" inputmode="email" autocomplete="email" spellcheck="false"></div>
+      <div class="field"><label for="co-fulfill">Método de entrega</label><select class="input" id="co-fulfill" name="fulfillment_type" autocomplete="off" required>
+        ${v.pickup_enabled ? '<option value="pickup">Recojo en el local</option>' : ''}
+        ${v.delivery_enabled ? '<option value="delivery">Delivery</option>' : ''}
+      </select></div>
+      <div class="field hide" id="co-zone-field"><label for="co-zone">Zona de delivery</label><select class="input" id="co-zone" name="zone_id" autocomplete="off">
+        ${v.zones.map((z) => `<option value="${z.id}">${esc(z.name)} — ${fmtMoney(z.delivery_fee_minor)} (mín. ${fmtMoney(z.minimum_order_minor)})</option>`).join('')}
+      </select></div>
+      <div class="field hide" id="co-addr-field"><label for="co-addr">Dirección</label><input class="input" id="co-addr" name="address" autocomplete="street-address"></div>
+      <div class="field hide" id="co-ref-field"><label for="co-ref">Referencia (opcional)</label><input class="input" id="co-ref" name="address_reference" autocomplete="off"></div>
+      <div class="field"><label for="co-notes">Notas del pedido (opcional)</label><textarea class="input" id="co-notes" name="order_notes" autocomplete="off" placeholder="Ej. llegaré en 20 minutos…"></textarea></div>
+      <div class="field"><label for="co-coupon">Cupón (opcional)</label><div class="row"><input class="input" id="co-coupon" name="coupon_code" autocomplete="off" spellcheck="false" style="flex:1" placeholder="Ej. BIENVENIDA10…" aria-describedby="co-coupon-msg"><button class="btn btn-ghost" type="button" id="co-coupon-btn">Aplicar</button></div><div class="help" id="co-coupon-msg" aria-live="polite"></div></div>
+      <div class="card card-tight" style="margin:12px 0" aria-live="polite">
+        <div class="split muted" style="font-size:13px"><span>Subtotal</span><span class="num" id="co-subtotal">${fmtMoney(cartTotal())}</span></div>
+        <div class="split muted" style="font-size:13px"><span>Descuento</span><span class="num" id="co-discount">S/ 0.00</span></div>
+        <div class="split muted" style="font-size:13px"><span>Delivery</span><span class="num" id="co-fee">S/ 0.00</span></div>
+        <div class="split muted" style="font-size:13px"><span>IGV (18%)</span><span class="num" id="co-tax">S/ 0.00</span></div>
+        <div class="split" style="margin-top:8px"><strong>Total</strong><strong class="num" id="co-total">—</strong></div>
+      </div>
+      <button class="btn btn-accent btn-lg btn-block" type="submit" id="co-submit">Confirmar pedido</button>
+      <p class="help" id="co-server-note" style="margin-top:10px">Al confirmar, el monto final lo calcula el servidor al 100%.</p>
+    </form>`, { title: '' });
+  const field = (id) => m.body.querySelector('#' + id);
+  const fulf = () => field('co-fulfill').value;
+  const syncFulfillmentFields = () => {
+    const d = fulf() === 'delivery';
+    field('co-zone-field').classList.toggle('hide', !d);
+    field('co-addr-field').classList.toggle('hide', !d);
+    field('co-ref-field').classList.toggle('hide', !d);
+    field('co-zone').required = d;
+    field('co-addr').required = d;
+  };
+  field('co-fulfill').addEventListener('change', syncFulfillmentFields);
+  syncFulfillmentFields();
+  field('co-coupon-btn').addEventListener('click', () => { field('co-coupon-msg').textContent = 'El cupón se validará al confirmar el pedido.'; });
+  field('co-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = field('co-submit'); btn.classList.add('loading'); btn.disabled = true;
+    try {
+      const items = state.cart.items.map((i) => ({ product_id: i.product_id, quantity: i.qty, option_ids: i.option_ids || [], notes: i.notes || '' }));
+      const order = await api(`/public/venues/${slug}/orders`, { method: 'POST', body: {
+        items,
+        idempotency_key: crypto.randomUUID(),
+        customer: { name: field('co-name').value.trim(), phone: field('co-phone').value.trim(), email: field('co-email').value.trim() || undefined },
+        fulfillment: { type: fulf(), zone_id: fulf() === 'delivery' ? Number(field('co-zone').value) : undefined, address: fulf() === 'delivery' ? field('co-addr').value.trim() : undefined, reference: fulf() === 'delivery' ? field('co-ref').value.trim() : undefined },
+        notes: field('co-notes').value.trim() || undefined,
+        coupon_code: field('co-coupon').value.trim() || undefined,
+      } });
+      state.order = order; localStorage.removeItem('ros_cart'); state.cart = { slug, items: [], ts: Date.now() }; saveCart();
+      m.close(); renderCartBar(); renderPayment(order.public_token);
+    } catch (err) { toast(err.message, 'err'); btn.classList.remove('loading'); btn.disabled = false; }
+  });
+}
+
+function renderPayment(token) {
+  const m = modal(`
+    <h3>Pagar pedido #${esc(state.order.order_number || state.order.id)}</h3>
+    <div class="split" style="margin-bottom:14px"><span class="muted">Total a pagar</span><span class="num" style="font-size:22px;font-weight:600">${fmtMoney(state.order.totals.total_minor)}</span></div>
+    <form id="pay-form">
+      <div class="field"><label for="pay-last4">Últimos 4 dígitos de la tarjeta</label><input class="input" id="pay-last4" name="card_last4" maxlength="4" minlength="4" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" placeholder="Ej. 4242…" required aria-describedby="pay-help"></div>
+      <div class="field"><label for="pay-brand">Marca</label><select class="input" id="pay-brand" name="card_brand" autocomplete="cc-type" required><option value="visa">Visa</option><option value="mastercard">Mastercard</option></select></div>
+      <button class="btn btn-accent btn-lg btn-block" type="submit" id="pay-go">Pagar ahora</button>
+      <p class="help" id="pay-help" style="margin-top:10px">Demo segura: no se almacena ningún dato de tarjeta. Con 0001 el pago declina; con 9999 simulas una caída del proveedor.</p>
+    </form>`, { title: '' });
+  const btn = m.body.querySelector('#pay-go');
+  m.body.querySelector('#pay-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    btn.classList.add('loading'); btn.disabled = true;
+    try {
+      const res = await api(`/public/venues/${slug}/orders/${token}/pay`, { method: 'POST', body: { card_last4: m.body.querySelector('#pay-last4').value, card_brand: m.body.querySelector('#pay-brand').value } });
+      m.close(); state.order = res.order; renderTracking();
+    } catch (err) {
+      if (err.code === 'PAYMENT_DECLINED' || err.code === 'PROVIDER_UNAVAILABLE') { toast(err.message, 'err'); m.close(); renderPayment(token); }
+      else { toast(err.message, 'err'); btn.classList.remove('loading'); btn.disabled = false; }
+    }
+  });
+}
+
+function renderTracking() {
+  const token = state.order.public_token;
+  const root = $('#menu');
+  root.innerHTML = `<div class="shell" style="max-width:640px"><div class="card" style="text-align:center;padding:var(--sp-8) var(--sp-5)">
+    <div style="font-size:40px">✅</div>
+    <h2>¡Pedido recibido!</h2>
+    <p>Pedido #${state.order.order_number || ''} · ${fmtMoney(state.order.totals.total_minor)} · ${state.order.fulfillment_type === 'delivery' ? 'Delivery' : 'Recojo'}</p>
+    <div class="steps" id="steps"></div>
+    <div class="muted" style="font-size:13px" id="track-info" aria-live="polite" aria-atomic="true">Seguimiento en vivo…</div>
+    <div style="margin-top:24px" id="review-box"></div>
+  </div></div>`;
+  const orderStatuses = ['pending', 'accepted', 'preparing', 'ready', 'completed'];
+  const poll = async () => {
+    try {
+      const o = await api(`/public/orders/${token}`);
+      state.order = o;
+      const idx = o.status === 'cancelled' ? -1 : orderStatuses.indexOf(o.status);
+      document.querySelector('#steps').innerHTML = orderStatuses.map((s) => {
+        const i = orderStatuses.indexOf(s);
+        const cls = o.status === 'cancelled' ? '' : (i < idx ? 'done' : i === idx ? 'active' : '');
+        return `<div class="step ${cls}">${(['Nuevo', 'Aceptado', 'En preparación', 'Listo', 'Entregado'])[i]}</div>`;
+      }).join('');
+      document.querySelector('#track-info').textContent = o.status === 'cancelled' ? 'Tu pedido fue cancelado.' : `Estado actual: ${(['Nuevo', 'Aceptado', 'En preparación', 'Listo', 'Entregado'])[idx]} · Pago: ${o.payment_status === 'paid' ? 'Pagado' : o.payment_status === 'refunded' ? 'Reembolsado' : o.payment_status === 'failed' ? 'Pago fallido' : 'Pendiente'}`;
+      if (o.status === 'cancelled' || o.status === 'completed') { clearInterval(timer); renderReviewBox(o); }
+    } catch { /* reintenta */ }
+  };
+  const timer = setInterval(poll, 3000); poll();
+}
+
+function renderReviewBox(o) {
+  const box = document.querySelector('#review-box');
+  if (!box || o.status !== 'completed') return;
+  const already = o.reviewed || false;
+  box.innerHTML = `<h3 style="margin-bottom:8px">¿Cómo fue tu experiencia?</h3>
+    <div class="row" style="margin-bottom:12px">
+      ${state.venue?.features?.reviews_google_enabled !== false ? `<a class="btn btn-ghost" href="${state.venue.google_link || 'https://search.google.com/local/writereview?placeid=DEMO'}" target="_blank" rel="noopener">Dejar una reseña en Google</a>` : ''}
+      <button class="btn btn-ghost" type="button" id="rv-priv" aria-controls="rv-form" aria-expanded="false">Enviar un comentario privado</button>
+    </div>
+    <form class="hide" id="rv-form"><div class="field"><label for="rv-rating">Calificación</label><select class="input" id="rv-rating" name="rating" autocomplete="off" required><option value="5">5 — Excelente</option><option value="4">4 — Bueno</option><option value="3">3 — Regular</option><option value="2">2 — Malo</option><option value="1">1 — Muy malo</option></select></div>
+    <div class="field"><label for="rv-comment">Comentario</label><textarea class="input" id="rv-comment" name="comment" autocomplete="off" required></textarea></div>
+    <button class="btn btn-accent" type="submit" id="rv-send">Enviar comentario</button></form>`;
+  box.querySelector('#rv-priv').addEventListener('click', (event) => {
+    const form = box.querySelector('#rv-form');
+    const isHidden = form.classList.toggle('hide');
+    event.currentTarget.setAttribute('aria-expanded', String(!isHidden));
+    if (!isHidden) form.querySelector('select')?.focus();
+  });
+  box.querySelector('#rv-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const btn = box.querySelector('#rv-send'); btn.classList.add('loading'); btn.disabled = true;
+    try {
+      await api(`/public/venues/${slug}/orders/${o.public_token}/review`, { method: 'POST', body: { rating: Number(box.querySelector('#rv-rating').value), comment: box.querySelector('#rv-comment').value } });
+      toast('Gracias por tu retroalimentación', 'ok'); box.innerHTML = '<p class="muted">Comentario enviado. ¡Gracias!</p>';
+    } catch (err) { toast(err.message, 'err'); btn.classList.remove('loading'); btn.disabled = false; }
+  });
+}
+
+loadVenue();
+</script>
+</body>
+</html>

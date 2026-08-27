@@ -1,0 +1,86 @@
+{
+  "base": "http://127.0.0.1:3187",
+  "pages": {
+    "storefront-mobile-before": {
+      "title": "Casa Aurora — Menú y pedidos en línea",
+      "h1": [
+        "Casa Aurora"
+      ],
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "buttons": 16,
+      "links": 4,
+      "unlabeledInputs": 1,
+      "missingNames": 1,
+      "search": {
+        "ok": true,
+        "value": "c",
+        "focused": false,
+        "results": 11
+      },
+      "addAction": {
+        "modalOpen": true,
+        "cartVisible": false,
+        "cartText": ""
+      }
+    },
+    "admin-desktop-before": {
+      "title": "Restaurant OS — Panel de negocio",
+      "h1": [
+        "Restaurant OS"
+      ],
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "buttons": 4,
+      "links": 2,
+      "unlabeledInputs": 2,
+      "missingNames": 2
+    },
+    "admin-desktop-after-login-before": {
+      "url": "http://127.0.0.1:3187/admin.html",
+      "h1": [],
+      "h2": [
+        "Analítica"
+      ],
+      "activeNav": "Hoy",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "timerPageErrors": [
+        {
+          "page": "admin-desktop-before",
+          "text": "Cannot set properties of null (setting 'textContent')"
+        }
+      ]
+    },
+    "admin-mobile-before": {
+      "title": "Restaurant OS — Panel de negocio",
+      "h1": [
+        "Restaurant OS"
+      ],
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "buttons": 4,
+      "links": 2,
+      "unlabeledInputs": 2,
+      "missingNames": 2
+    }
+  },
+  "console": [
+    {
+      "page": "admin-desktop-before",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "page": "admin-mobile-before",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    }
+  ],
+  "pageErrors": [
+    {
+      "page": "admin-desktop-before",
+      "text": "Cannot set properties of null (setting 'textContent')"
+    }
+  ]
+}

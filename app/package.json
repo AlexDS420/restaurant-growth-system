@@ -1,0 +1,18 @@
+{
+  "name": "restaurant-os",
+  "version": "1.0.0",
+  "description": "SaaS multi-tenant de comercio y operaciones para restaurantes (es-PE, PEN) — Restaurant OS",
+  "type": "module",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "NODE_ENV=development node --watch server/server.js",
+    "test": "node --test",
+    "seed": "node server/seed.js",
+    "backup": "bash scripts/backup.sh",
+    "rollback": "bash scripts/rollback.sh",
+    "drill": "bash scripts/rehearsal.sh"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

@@ -1,0 +1,76 @@
+{
+  "base": "http://127.0.0.1:3187",
+  "pages": {
+    "storefront-mobile-before": {
+      "title": "Casa Aurora — Menú y pedidos en línea",
+      "h1": [
+        "Casa Aurora"
+      ],
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "buttons": 27,
+      "links": 5,
+      "unlabeledInputs": 0,
+      "missingNames": 0,
+      "search": {
+        "ok": true,
+        "value": "cev",
+        "focused": true,
+        "results": 1
+      },
+      "addAction": {
+        "modalOpen": false,
+        "cartVisible": true,
+        "cartText": "Ver detalle\n    1 artículo\n    S/ 28.00\n    Confirmar pedido"
+      }
+    },
+    "admin-desktop-before": {
+      "title": "Restaurant OS — Panel de negocio",
+      "h1": [
+        "Restaurant OS"
+      ],
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "buttons": 4,
+      "links": 3,
+      "unlabeledInputs": 0,
+      "missingNames": 0
+    },
+    "admin-desktop-after-login-before": {
+      "url": "http://127.0.0.1:3187/admin.html?section=hoy",
+      "h1": [
+        "Hoy en Casa Aurora"
+      ],
+      "h2": [],
+      "activeNav": "Hoy",
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "timerPageErrors": []
+    },
+    "admin-mobile-before": {
+      "title": "Restaurant OS — Panel de negocio",
+      "h1": [
+        "Restaurant OS"
+      ],
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "buttons": 4,
+      "links": 3,
+      "unlabeledInputs": 0,
+      "missingNames": 0
+    }
+  },
+  "console": [
+    {
+      "page": "admin-desktop-before",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    },
+    {
+      "page": "admin-mobile-before",
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    }
+  ],
+  "pageErrors": []
+}
