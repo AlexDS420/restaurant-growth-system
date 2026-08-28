@@ -17,6 +17,7 @@ function call_api(int $port, string $method, string $path, ?array $body = null):
 }
 function check_true(bool $condition, string $message): void { if (!$condition) throw new RuntimeException('FAIL: '.$message); echo 'OK: '.$message.PHP_EOL; }
 try {
+    [$status, $health] = call_api($apiPort, 'GET', '/api/v1/healthz'); check_true($status === 200 && ($health['data']['supabase_configured'] ?? false) === true, 'healthz reporta Supabase configurado');
     [$status, $menu] = call_api($apiPort, 'GET', '/api/v1/public/venues/casa-lima/menu'); check_true($status === 200 && ($menu['data']['categories'][0]['products'][0]['price_minor'] ?? 0) === 2500, 'GET menú usa Supabase: '.json_encode([$status, $menu], JSON_UNESCAPED_UNICODE));
     [$status, $created] = call_api($apiPort, 'POST', '/api/v1/public/venues/casa-lima/orders', ['items'=>[['product_id'=>'22222222-2222-4222-8222-222222222222','quantity'=>1,'unit_price_minor'=>1]],'idempotency_key'=>'test-key','customer'=>['name'=>'Cliente','phone'=>'999999999'],'fulfillment'=>['type'=>'pickup']]);
     check_true($status === 201 && ($created['data']['totals']['subtotal_minor'] ?? 0) === 2500 && ($created['data']['totals']['total_minor'] ?? 0) === 2950, 'pedido ignora precio manipulado y recalcula server-side: '.json_encode([$status, $created], JSON_UNESCAPED_UNICODE));

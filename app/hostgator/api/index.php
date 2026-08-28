@@ -3,7 +3,12 @@ declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 
 try {
-    $db = SupabaseRest::fromEnv(); $method = request_method(); $path = request_path();
+    $method = request_method(); $path = request_path();
+    if ($method === 'GET' && $path === '/api/v1/healthz') {
+        $configured = trim((string)env_value('SUPABASE_URL', '')) !== '' && trim((string)env_value('SUPABASE_SERVICE_ROLE_KEY', '')) !== '';
+        respond(['status' => $configured ? 'ready' : 'degraded', 'supabase_configured' => $configured], $configured ? 200 : 503);
+    }
+    $db = SupabaseRest::fromEnv();
     if ($method === 'GET' && preg_match('#^/api/v1/public/venues/([^/]+)/menu$#', $path, $m)) {
         $slug = rawurldecode($m[1]); $venues = $db->query('ros_venues', ['slug' => 'eq.' . rawurlencode($slug), 'status' => 'eq.active', 'select' => '*', 'limit' => '1']);
         if (!$venues) throw new ApiException(404, 'VENUE_NOT_FOUND', 'No encontramos este negocio.'); $venue = $venues[0];
