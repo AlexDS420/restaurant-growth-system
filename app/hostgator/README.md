@@ -6,7 +6,7 @@ Este BFF está pensado para un plan básico de HostGator: PHP 8.1+, HTTPS, cPane
 
 1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en un proyecto Supabase de prueba y luego `hostgator/supabase/004_outbox_events.sql` para habilitar la cola del cron.
 2. Copia `hostgator/.env.example` a un archivo `.env` fuera de `public_html` cuando sea posible.
-3. Configura `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor PHP. Nunca los incluyas en `public/`, Vite o JavaScript.
+3. Configura `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor PHP. Nunca incluyas la `service_role` en `public/`, Vite o JavaScript.
 4. Publica `api/` detrás de HTTPS y activa `api/.htaccess`.
 5. Configura el frontend para consumir `/api/v1`.
 
