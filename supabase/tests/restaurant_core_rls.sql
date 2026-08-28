@@ -20,10 +20,10 @@ select ok(
 );
 
 set local role anon;
-select throws_ok($$select count(*) from public.organizations$$, '42501', 'anon no tiene grant para organizaciones');
-select throws_ok($$select count(*) from public.payments$$, '42501', 'anon no tiene grant para pagos');
-select throws_ok($$select count(*) from public.receipts$$, '42501', 'anon no tiene grant para comprobantes futuros');
-select throws_ok($$select count(*) from public.complaints$$, '42501', 'anon no tiene grant para reclamos futuros');
+select throws_ok($$select count(*) from public.organizations$$, 42501, 'permission denied for table organizations', 'anon no tiene grant para organizaciones');
+select throws_ok($$select count(*) from public.payments$$, 42501, 'permission denied for table payments', 'anon no tiene grant para pagos');
+select throws_ok($$select count(*) from public.receipts$$, 42501, 'permission denied for table receipts', 'anon no tiene grant para comprobantes futuros');
+select throws_ok($$select count(*) from public.complaints$$, 42501, 'permission denied for table complaints', 'anon no tiene grant para reclamos futuros');
 
 select * from finish();
 rollback;
