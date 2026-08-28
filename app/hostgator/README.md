@@ -4,7 +4,7 @@ Este BFF está pensado para un plan básico de HostGator: PHP 8.1+, HTTPS, cPane
 
 ## Instalación
 
-1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en un proyecto Supabase de prueba. Esa es la única migración canónica del BFF.
+1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en un proyecto Supabase de prueba y luego `hostgator/supabase/004_outbox_events.sql` para habilitar la cola del cron.
 2. Copia `hostgator/.env.example` a un archivo `.env` fuera de `public_html` cuando sea posible.
 3. Configura `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor PHP. Nunca los incluyas en `public/`, Vite o JavaScript.
 4. Publica `api/` detrás de HTTPS y activa `api/.htaccess`.
@@ -24,7 +24,19 @@ El endpoint público de pago acepta exclusivamente `yape` o `plin`, guarda el c�
 - `POST /api/v1/payments/{id}/confirm`
 - `GET /api/v1/payments/reconciliation`
 
-El BFF rechaza JSON inválido, usa cookies HttpOnly/SameSite, sesiones con hash, CSRF en mutaciones autenticadas, errores JSON uniformes, límites de campos y separación de secretos. Antes de declarar producción se debe probar el esquema en Supabase, HTTPS, RLS, backups, cPanel, restauración y un piloto real de Lima.
+El BFF rechaza JSON inválido, usa cookies HttpOnly/SameSite, Supabase Auth, CSRF en mutaciones autenticadas, errores JSON uniformes, límites de campos y separación de secretos. Antes de declarar producción se debe probar el esquema en Supabase, HTTPS, RLS, backups, cPanel, restauración y un piloto real de Lima.
+
+## Outbox y cron de cPanel
+
+Ejecuta `supabase/004_outbox_events.sql` en Supabase. Configura `OUTBOX_WEBHOOK_URL` en el `.env` privado del servidor como un endpoint HTTPS controlado por el negocio. El worker `cron/process_outbox.php` es exclusivamente CLI y no se debe publicar como ruta web.
+
+Cron recomendado cada minuto:
+
+```cron
+* * * * * /usr/local/bin/php /home/USUARIO/restaurant-growth/app/hostgator/cron/process_outbox.php >> /home/USUARIO/logs/restaurant-outbox.log 2>&1
+```
+
+El worker reclama hasta 25 eventos pendientes, usa `X-Idempotency-Key` con el UUID del evento, aplica reintentos exponenciales hasta 8 intentos y mueve los eventos agotados a `dead_letter`. Un estado `failed` queda programado para reintento; `sent` es terminal. El servicio receptor debe tratar el header de idempotencia como único para evitar envíos duplicados.
 
 ## cPanel cron
 
