@@ -20,4 +20,4 @@ npm run build
 
 El resultado queda en `dist/` y puede publicarse como fallback estático en HostGator dentro de un subdirectorio o dominio separado. El BFF PHP/Supabase debe seguir atendiendo `/api`; si se publica el frontend en un dominio distinto, configura CORS explícito y `credentials` según la política de sesión.
 
-Para activar una pantalla migrada, cambia el enlace o ruta del HTML existente hacia este `dist/`; no borres `app/public` hasta que el flujo equivalente haya pasado pruebas de aceptación, accesibilidad, móvil y producción. El botón de checkout de esta primera superficie es deliberadamente un placeholder y no debe habilitarse como checkout productivo hasta conectar el flujo real del BFF.
+Para activar una pantalla migrada, cambia el enlace o ruta del HTML existente hacia este `dist/`; no borres `app/public` hasta que el flujo equivalente haya pasado pruebas de aceptación, accesibilidad, móvil y producción. El checkout incremental ya envía pedidos al BFF y registra Yape/Plin cuando se proporciona el código de operación; aún requiere pruebas remotas con Supabase y HostGator antes de producción.
