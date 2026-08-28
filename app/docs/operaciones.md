@@ -1,5 +1,8 @@
 # Operaciones — Restaurant OS
 
+> **Legacy SQLite:** este documento describe el backend Node/SQLite histórico. El despliegue HostGator
+> usa el BFF PHP y Supabase con tablas `ros_*`; no ejecutes estas consultas sobre el proyecto remoto.
+
 ## 1. Rutinas diarias/semanales
 
 - **Respaldo:** `npm run backup` (o cron diario). Retención sugerida: 14 días.

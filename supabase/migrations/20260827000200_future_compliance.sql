@@ -70,8 +70,10 @@ alter table public.ros_complaints enable row level security;
 revoke all on table public.ros_receipts, public.ros_complaints from anon, authenticated;
 grant select, insert, update on table public.ros_receipts, public.ros_complaints to authenticated;
 
+drop policy if exists "members manage future ros_receipts" on public.ros_receipts;
 create policy "members manage future ros_receipts" on public.ros_receipts for all to authenticated
   using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage future ros_complaints" on public.ros_complaints;
 create policy "members manage future ros_complaints" on public.ros_complaints for all to authenticated
   using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
 

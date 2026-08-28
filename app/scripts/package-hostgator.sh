@@ -20,12 +20,12 @@ cp "$APP_DIR/hostgator/.env.example" "$OUT/private/.env.example"
 cat > "$OUT/README-CPANEL.md" <<'EOF'
 # Instalación HostGator
 
-1. Sube el contenido de `public_html/` a `public_html/` del dominio.
+1. En el dominio `restaurant.ds8.agency`, sube el contenido interno de `public_html/` directamente a `/home2/aebfbbmi/restaurant.ds8.agency/` (ese directorio ya es el document root; no crees un segundo `public_html`).
 2. Mantén `private/` fuera del document root cuando cPanel lo permita.
 3. Copia `private/.env.example` a `private/.env` y completa Supabase y el webhook HTTPS. No subas ese `.env` al repositorio.
-4. Ejecuta las migraciones Supabase antes de recibir pedidos.
+4. Ejecuta las migraciones Supabase antes de recibir pedidos. El núcleo usa tablas `ros_*` para no colisionar con otros sistemas del proyecto.
 5. Configura el cron con la ruta absoluta de `private/cron/process_outbox.php`.
-6. Comprueba HTTPS, `/api/v1/healthz` (si está habilitado) y un pedido de prueba en PEN.
+6. Comprueba HTTPS, `/api/v1/healthz` (si está habilitado) y un pedido de prueba en PEN. El paquete actual publica el storefront React; el panel administrativo legacy requiere una pasada de migración BFF separada.
 EOF
 
 # La lista evita que archivos de desarrollo o secretos lleguen al hosting.

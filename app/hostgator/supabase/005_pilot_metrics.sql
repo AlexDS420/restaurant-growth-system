@@ -18,7 +18,7 @@ alter table public.ros_pilot_metric_events enable row level security;
 drop policy if exists "pilot_metrics_no_client_access" on public.ros_pilot_metric_events;
 create policy "pilot_metrics_no_client_access" on public.ros_pilot_metric_events for all to anon, authenticated using (false) with check (false);
 
-create or replace view public.pilot_metrics_daily
+create or replace view public.ros_pilot_metrics_daily
 with (security_invoker = true) as
 select venue_id, (occurred_at at time zone 'America/Lima')::date as metric_date, metric_name,
        count(*)::bigint as event_count, coalesce(sum(value), 0)::numeric as value_total
@@ -26,4 +26,4 @@ from public.ros_pilot_metric_events
 group by venue_id, (occurred_at at time zone 'America/Lima')::date, metric_name;
 
 revoke all on public.ros_pilot_metric_events from anon, authenticated;
-revoke all on public.pilot_metrics_daily from anon, authenticated;
+revoke all on public.ros_pilot_metrics_daily from anon, authenticated;

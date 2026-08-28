@@ -1,6 +1,6 @@
 # Métricas del piloto Lima
 
-El piloto registra eventos en `public.pilot_metric_events` de Supabase. El registro es append-only, tiene idempotencia por negocio y clave, y queda bloqueado para `anon`/`authenticated` mediante RLS. El BFF PHP y los cron usan `service_role`; no requiere Node ni un worker persistente.
+El piloto registra eventos en `public.ros_pilot_metric_events` de Supabase. El registro es append-only, tiene idempotencia por negocio y clave, y queda bloqueado para `anon`/`authenticated` mediante RLS. El BFF PHP y los cron usan `service_role`; no requiere Node ni un worker persistente.
 
 ## Eventos mínimos
 
@@ -27,7 +27,7 @@ El BFF debe insertar eventos con una clave determinista, por ejemplo `order:{uui
 
 ## Consultas del piloto
 
-La vista `public.pilot_metrics_daily` permite consultar el tablero diario en zona horaria de Lima (`America/Lima`). Indicadores recomendados:
+La vista `public.ros_pilot_metrics_daily` permite consultar el tablero diario en zona horaria de Lima (`America/Lima`). Indicadores recomendados:
 
 - conversión de onboarding: completados / iniciados;
 - pedidos por día, canal y modalidad;

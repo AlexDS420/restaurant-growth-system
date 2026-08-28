@@ -19,4 +19,5 @@ create table if not exists public.ros_outbox_events (
 create index if not exists outbox_due_idx on public.ros_outbox_events (status, next_attempt_at, created_at);
 alter table public.ros_outbox_events enable row level security;
 -- El worker usa service_role desde CLI; el cliente no obtiene acceso a la cola.
+drop policy if exists "outbox_no_client_access" on public.ros_outbox_events;
 create policy "outbox_no_client_access" on public.ros_outbox_events for all to anon, authenticated using (false) with check (false);

@@ -1,5 +1,9 @@
 # Datos de auditoría y consultas de verificación
 
+> **Legacy SQLite:** las consultas de este documento corresponden al backend histórico. Para el BFF
+> PHP/Supabase usa `public.ros_audit_logs`, `public.ros_orders` y `public.ros_payments` con el acceso
+> privilegiado controlado del servidor; nunca expongas `service_role` al navegador.
+
 El panel "Auditoría" expone `GET /api/v1/audit` (filtros: entity_type, action, from, to). Debajo, el
 set de consultas SQL directas para auditoría, trazabilidad y reconciliación.
 

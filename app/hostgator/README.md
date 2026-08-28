@@ -4,13 +4,13 @@ Este BFF está pensado para un plan básico de HostGator: PHP 8.1+, HTTPS, cPane
 
 ## Instalación
 
-1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en un proyecto Supabase de prueba y luego `hostgator/supabase/004_outbox_events.sql` para habilitar la cola del cron.
+1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en el proyecto Supabase y luego, desde `app/`, `hostgator/supabase/004_outbox_events.sql` y `hostgator/supabase/005_pilot_metrics.sql` para habilitar la cola y métricas del cron. Las tablas están aisladas con prefijo `ros_` para no tocar otros sistemas del proyecto.
 2. Copia `hostgator/.env.example` a `/home2/aebfbbmi/private/restaurant-cron/.env` (fuera de `public_html`) en el despliegue de producción. El BFF también admite `BFF_ENV_FILE` para una ruta alternativa.
 3. Configura `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor PHP. Nunca incluyas la `service_role` en `public/`, Vite o JavaScript.
 4. Publica `api/` detrás de HTTPS y activa `api/.htaccess`.
 5. Configura el frontend para consumir `/api/v1`.
 
-El endpoint público de pago acepta exclusivamente `yape` o `plin`, guarda el código de operación y lo deja en estado `pending` para revisión autorizada. Una captura no confirma un pago. Un usuario `owner`, `manager` o `cashier` puede confirmar o rechazar mediante `POST /api/v1/payments/{id}/confirm` con `X-CSRF-Token`.
+El endpoint público de pago acepta exclusivamente `yape` o `plin`, guarda el código de operación y lo deja en estado `verifying` para revisión autorizada. Una captura no confirma un pago. Un usuario `owner`, `manager` o `cashier` puede confirmar o rechazar mediante `POST /api/v1/payments/{id}/confirm` con `X-CSRF-Token`.
 
 ## Contrato mínimo
 

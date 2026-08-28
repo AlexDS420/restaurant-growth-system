@@ -247,37 +247,59 @@ grant select, insert, update, delete on table
   public.ros_payment_events, public.ros_audit_logs to authenticated;
 grant usage, select on sequence public.ros_audit_logs_id_seq to authenticated;
 
+drop policy if exists "public can read published venue" on public.ros_venues;
 create policy "public can read published venue" on public.ros_venues for select to anon
   using (status = 'active' and is_published);
+drop policy if exists "public can read visible categories" on public.ros_menu_categories;
 create policy "public can read visible categories" on public.ros_menu_categories for select to anon
   using (is_visible and exists (select 1 from public.ros_venues v where v.id = venue_id and v.status = 'active' and v.is_published));
+drop policy if exists "public can read available products" on public.ros_menu_products;
 create policy "public can read available products" on public.ros_menu_products for select to anon
   using (is_visible and is_available and deleted_at is null and exists (select 1 from public.ros_venues v where v.id = venue_id and v.status = 'active' and v.is_published));
+drop policy if exists "public can read option groups" on public.ros_option_groups;
 create policy "public can read option groups" on public.ros_option_groups for select to anon
   using (exists (select 1 from public.ros_venues v where v.id = venue_id and v.status = 'active' and v.is_published));
+drop policy if exists "public can read ros_options" on public.ros_options;
 create policy "public can read ros_options" on public.ros_options for select to anon
   using (is_available and exists (select 1 from public.ros_venues v where v.id = venue_id and v.status = 'active' and v.is_published));
+drop policy if exists "public can read product option links" on public.ros_product_option_groups;
 create policy "public can read product option links" on public.ros_product_option_groups for select to anon
   using (exists (select 1 from public.ros_menu_products p join public.ros_venues v on v.id = p.venue_id where p.id = product_id and p.is_visible and p.is_available and v.status = 'active' and v.is_published));
 
+drop policy if exists "members read ros_organizations" on public.ros_organizations;
 create policy "members read ros_organizations" on public.ros_organizations for select to authenticated using (is_org_member(id));
+drop policy if exists "members update ros_organizations" on public.ros_organizations;
 create policy "members update ros_organizations" on public.ros_organizations for update to authenticated using (is_org_member(id)) with check (is_org_member(id));
+drop policy if exists "users read own memberships" on public.ros_organization_members;
 create policy "users read own memberships" on public.ros_organization_members for select to authenticated using (user_id = (select auth.uid()));
+drop policy if exists "members read ros_venues" on public.ros_venues;
 create policy "members read ros_venues" on public.ros_venues for select to authenticated using (is_org_member(organization_id));
+drop policy if exists "members manage ros_venues" on public.ros_venues;
 create policy "members manage ros_venues" on public.ros_venues for all to authenticated using (is_org_member(organization_id)) with check (is_org_member(organization_id));
 
+drop policy if exists "members manage categories" on public.ros_menu_categories;
 create policy "members manage categories" on public.ros_menu_categories for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage products" on public.ros_menu_products;
 create policy "members manage products" on public.ros_menu_products for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage option groups" on public.ros_option_groups;
 create policy "members manage option groups" on public.ros_option_groups for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage ros_options" on public.ros_options;
 create policy "members manage ros_options" on public.ros_options for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage product option links" on public.ros_product_option_groups;
 create policy "members manage product option links" on public.ros_product_option_groups for all to authenticated
   using (exists (select 1 from public.ros_menu_products p where p.id = product_id and is_venue_member(p.venue_id)))
   with check (exists (select 1 from public.ros_menu_products p where p.id = product_id and is_venue_member(p.venue_id)));
+drop policy if exists "members manage ros_customers" on public.ros_customers;
 create policy "members manage ros_customers" on public.ros_customers for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage ros_orders" on public.ros_orders;
 create policy "members manage ros_orders" on public.ros_orders for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage order items" on public.ros_order_items;
 create policy "members manage order items" on public.ros_order_items for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members manage ros_payments" on public.ros_payments;
 create policy "members manage ros_payments" on public.ros_payments for all to authenticated using (is_venue_member(venue_id)) with check (is_venue_member(venue_id));
+drop policy if exists "members read payment events" on public.ros_payment_events;
 create policy "members read payment events" on public.ros_payment_events for select to authenticated using (is_venue_member(venue_id));
+drop policy if exists "members read audit logs" on public.ros_audit_logs;
 create policy "members read audit logs" on public.ros_audit_logs for select to authenticated using (venue_id is not null and is_venue_member(venue_id));
 
 comment on table public.ros_payments is 'Métodos PEN: yape/plin permiten verificación manual o integración oficial; una captura no confirma el pago.';

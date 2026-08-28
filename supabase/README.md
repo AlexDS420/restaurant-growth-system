@@ -2,8 +2,8 @@
 
 La migración `migrations/20260827000100_restaurant_core.sql` define el núcleo Postgres para restaurantes de Lima:
 
-- `organizations`, `organization_members` y `venues` para multitenancy;
-- catálogo (`menu_categories`, `menu_products`, `option_groups`, `options` y vínculos);
+- tablas aisladas `ros_organizations`, `ros_organization_members` y `ros_venues` para multitenancy;
+- catálogo (`ros_menu_categories`, `ros_menu_products`, `ros_option_groups`, `ros_options` y vínculos);
 - clientes, pedidos y snapshots de líneas;
 - pagos en PEN con `cash`, `yape`, `plin`, transferencia y tarjeta;
 - estados `pending`, `verifying`, `confirmed`, `rejected`, `expired`, `refunded` y `partially_refunded`;
@@ -18,7 +18,7 @@ La migración posterior `migrations/20260827000200_future_compliance.sql` deja p
 3. En el frontend usar únicamente la publishable/anon key y un BFF PHP server-side.
 4. Nunca incluir `service_role` en React, Vite, HTML, JavaScript, repositorio ni variables `VITE_*`.
 5. El BFF debe validar sesión, tenant, importes calculados server-side y autorización antes de mutar.
-6. Webhooks de Yape/Plin o de la pasarela deben verificarse en el BFF con firma y cuerpo raw antes de insertar `payment_events`.
+6. Webhooks de Yape/Plin o de la pasarela deben verificarse en el BFF con firma y cuerpo raw antes de insertar `ros_payment_events`.
 
 ## Yape y Plin
 
@@ -26,10 +26,10 @@ La base registra comprobante/código (`operation_code`), importe esperado, méto
 
 ## Limitaciones de esta migración
 
-- No conecta ni aplica cambios a ningún proyecto remoto.
+- La migración aislada fue aplicada manualmente en el proyecto Supabase del piloto el 2026-08-27; el prefijo `ros_` evita colisiones con tablas ERP preexistentes.
 - No contiene secretos, QR, números de cuenta ni credenciales.
 - No reemplaza el BFF Node actual: es la base de la migración progresiva hacia PHP + Supabase.
 - La escritura de auditoría desde el backend debe implementarse como operación controlada y append-only.
-- Debe añadirse una suite `supabase/tests/` con pruebas allow/deny para cada tabla antes de declarar producción.
+- La suite `supabase/tests/restaurant_core_rls.sql` valida RLS y debe ampliarse con fixtures allow/deny antes de declarar producción.
 - Antes de activar comprobantes o Libro de Reclamaciones deben añadirse fixtures y pruebas de plazos, correlativos, CDR, estados, permisos de caja/administración y acceso público exclusivamente a través del BFF.
 - El frontend público debe consultar solo filas publicadas mediante el BFF o la API con las políticas anon descritas.
