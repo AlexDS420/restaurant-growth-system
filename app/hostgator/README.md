@@ -38,6 +38,10 @@ Cron recomendado cada minuto:
 
 El worker reclama hasta 25 eventos pendientes, usa `X-Idempotency-Key` con el UUID del evento, aplica reintentos exponenciales hasta 8 intentos y mueve los eventos agotados a `dead_letter`. Un estado `failed` queda programado para reintento; `sent` es terminal. El servicio receptor debe tratar el header de idempotencia como único para evitar envíos duplicados.
 
+## Empaquetado reproducible
+
+Desde `app/`, ejecuta `./scripts/package-hostgator.sh`. El script usa `frontend/dist/` cuando existe y, como fallback, `public/`; copia el BFF PHP a `public_html/api/`, deja el worker en `private/cron/`, excluye secretos, bases de datos, logs, `node_modules`, tests y datos, y genera `manifest.sha256`. Pasa la ruta de salida como primer argumento para no sobrescribir el paquete anterior.
+
 ## cPanel cron
 
 Mantén `cron/` fuera de `public_html` y programa, por ejemplo, cada 5 minutos:
