@@ -15,7 +15,7 @@ mkdir -p "$OUT/public_html" "$OUT/private/cron" "$OUT/private"
 cp -R "$FRONTEND"/. "$OUT/public_html"/
 mkdir -p "$OUT/public_html/api"
 cp "$APP_DIR/hostgator/api/index.php" "$APP_DIR/hostgator/api/bootstrap.php" "$APP_DIR/hostgator/api/.htaccess" "$OUT/public_html/api/"
-cp "$APP_DIR/hostgator/cron/process_outbox.php" "$OUT/private/cron/"
+cp "$APP_DIR"/hostgator/cron/*.php "$OUT/private/cron/"
 cp "$APP_DIR/hostgator/.env.example" "$OUT/private/.env.example"
 cat > "$OUT/README-CPANEL.md" <<'EOF'
 # Instalación HostGator
