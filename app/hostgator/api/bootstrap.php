@@ -91,14 +91,28 @@ final class SupabaseRest
     }
     public function authUser(string $accessToken): array
     { return $this->rawRequest('GET', '/auth/v1/user', [], null, ['apikey: ' . $this->serviceKey, 'Authorization: Bearer ' . $accessToken]); }
+    private function send(string $method, string $url, array $headers, ?string $body = null): array
+    {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            if ($ch !== false) {
+                curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15, CURLOPT_POSTFIELDS => $body]);
+                $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch);
+                if ($raw !== false && $err === '') return [$status, (string)$raw];
+            }
+        }
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !ini_get('allow_url_fopen')) throw new ApiException(503, 'SUPABASE_UNAVAILABLE', 'No se pudo consultar la base de datos.');
+        $context = stream_context_create(['http' => ['method' => $method, 'header' => implode("\r\n", $headers), 'content' => $body ?? '', 'timeout' => 15, 'ignore_errors' => true], 'ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
+        $raw = @file_get_contents($url, false, $context); $status = 0;
+        foreach (($http_response_header ?? []) as $line) if (preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $match)) { $status = (int)$match[1]; break; }
+        if ($raw === false) throw new ApiException(503, 'SUPABASE_UNAVAILABLE', 'No se pudo consultar la base de datos.');
+        return [$status, (string)$raw];
+    }
     private function rawRequest(string $method, string $path, array $params = [], ?array $body = null, array $extra = []): array
     {
         $url = $this->url . $path . ($params ? '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986) : '');
-        $ch = curl_init($url); if ($ch === false) throw new ApiException(503, 'HTTP_UNAVAILABLE', 'No se pudo inicializar la conexión.');
-        $headers = array_merge(['Accept: application/json'], $extra); if ($body !== null) $headers[] = 'Content-Type: application/json';
-        curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15, CURLOPT_POSTFIELDS => $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR)]);
-        $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch);
-        if ($raw === false || $err !== '') throw new ApiException(503, 'SUPABASE_UNAVAILABLE', 'No se pudo consultar autenticación.');
+        $headers = array_merge(['Accept: application/json'], $extra); $encoded = null; if ($body !== null) { $headers[] = 'Content-Type: application/json'; $encoded = json_encode($body, JSON_THROW_ON_ERROR); }
+        [$status, $raw] = $this->send($method, $url, $headers, $encoded);
         $decoded = json_decode($raw, true);
         if ($status >= 400) throw new ApiException($status === 400 ? 401 : 502, $status === 400 ? 'INVALID_CREDENTIALS' : 'SUPABASE_AUTH_ERROR', 'No se pudo autenticar la cuenta.');
         return is_array($decoded) ? $decoded : [];
@@ -106,12 +120,9 @@ final class SupabaseRest
     private function request(string $method, string $path, array $params = [], ?array $body = null, array $extra = []): array
     {
         $url = $this->url . $path . ($params ? '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986) : '');
-        $ch = curl_init($url); if ($ch === false) throw new ApiException(503, 'HTTP_UNAVAILABLE', 'No se pudo inicializar la conexión.');
-        $headers = array_merge(['apikey: ' . $this->serviceKey, 'Authorization: Bearer ' . $this->serviceKey, 'Accept: application/json'], $extra);
-        curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15]);
-        if ($body !== null) { $headers[] = 'Content-Type: application/json'; curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_THROW_ON_ERROR)); }
-        $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch);
-        if ($raw === false || $err !== '') throw new ApiException(503, 'SUPABASE_UNAVAILABLE', 'No se pudo consultar la base de datos.');
+        $headers = array_merge(['apikey: ' . $this->serviceKey, 'Authorization: Bearer ' . $this->serviceKey, 'Accept: application/json'], $extra); $encoded = null;
+        if ($body !== null) { $headers[] = 'Content-Type: application/json'; $encoded = json_encode($body, JSON_THROW_ON_ERROR); }
+        [$status, $raw] = $this->send($method, $url, $headers, $encoded);
         $decoded = json_decode($raw, true);
         if ($status >= 400) throw new ApiException(502, 'SUPABASE_ERROR', 'La base de datos rechazó la operación.');
         return is_array($decoded) ? $decoded : [];
