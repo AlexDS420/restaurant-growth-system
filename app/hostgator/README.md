@@ -42,6 +42,8 @@ El worker reclama hasta 25 eventos pendientes, usa `X-Idempotency-Key` con el UU
 
 Desde `app/`, ejecuta `./scripts/package-hostgator.sh`. El script usa `frontend/dist/` cuando existe y, como fallback, `public/`; copia el BFF PHP a `public_html/api/`, deja el worker en `private/cron/`, excluye secretos, bases de datos, logs, `node_modules`, tests y datos, y genera `manifest.sha256`. Pasa la ruta de salida como primer argumento para no sobrescribir el paquete anterior.
 
+La prueba local sin secretos se ejecuta desde `app/` con `php tests/bff-contract-test.php`; utiliza un Supabase REST falso en localhost y valida recalculo server-side, pago Yape pendiente y no exposición de la service key.
+
 ## cPanel cron
 
 Mantén `cron/` fuera de `public_html` y programa, por ejemplo, cada 5 minutos:

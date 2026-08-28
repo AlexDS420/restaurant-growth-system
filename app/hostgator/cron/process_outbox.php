@@ -18,7 +18,7 @@ function send_outbox_webhook(array $event): void
     $payload = json_encode(['event_id'=>$event['id'], 'event_type'=>$event['event_type'], 'entity_type'=>$event['entity_type'], 'entity_id'=>$event['entity_id'], 'venue_id'=>$event['venue_id'], 'payload'=>$event['payload']], JSON_THROW_ON_ERROR);
     $ch = curl_init($url); if ($ch === false) throw new RuntimeException('No se pudo inicializar webhook');
     curl_setopt_array($ch, [CURLOPT_POST=>true, CURLOPT_POSTFIELDS=>$payload, CURLOPT_RETURNTRANSFER=>true, CURLOPT_HTTPHEADER=>['Content-Type: application/json', 'X-Idempotency-Key: '.$event['id']], CURLOPT_CONNECTTIMEOUT=>5, CURLOPT_TIMEOUT=>15]);
-    $response = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $error = curl_error($ch); curl_close($ch);
+    $response = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $error = curl_error($ch);
     if ($response === false || $error !== '' || $status < 200 || $status >= 300) throw new RuntimeException('Webhook falló con HTTP ' . $status);
 }
 

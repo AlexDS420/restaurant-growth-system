@@ -89,7 +89,7 @@ final class SupabaseRest
         $ch = curl_init($url); if ($ch === false) throw new ApiException(503, 'HTTP_UNAVAILABLE', 'No se pudo inicializar la conexión.');
         $headers = array_merge(['Accept: application/json'], $extra); if ($body !== null) $headers[] = 'Content-Type: application/json';
         curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15, CURLOPT_POSTFIELDS => $body === null ? null : json_encode($body, JSON_THROW_ON_ERROR)]);
-        $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+        $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch);
         if ($raw === false || $err !== '') throw new ApiException(503, 'SUPABASE_UNAVAILABLE', 'No se pudo consultar autenticación.');
         $decoded = json_decode($raw, true);
         if ($status >= 400) throw new ApiException($status === 400 ? 401 : 502, $status === 400 ? 'INVALID_CREDENTIALS' : 'SUPABASE_AUTH_ERROR', 'No se pudo autenticar la cuenta.');
@@ -102,7 +102,7 @@ final class SupabaseRest
         $headers = array_merge(['apikey: ' . $this->serviceKey, 'Authorization: Bearer ' . $this->serviceKey, 'Accept: application/json'], $extra);
         curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 15]);
         if ($body !== null) { $headers[] = 'Content-Type: application/json'; curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_THROW_ON_ERROR)); }
-        $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+        $raw = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch);
         if ($raw === false || $err !== '') throw new ApiException(503, 'SUPABASE_UNAVAILABLE', 'No se pudo consultar la base de datos.');
         $decoded = json_decode($raw, true);
         if ($status >= 400) throw new ApiException(502, 'SUPABASE_ERROR', 'La base de datos rechazó la operación.');
