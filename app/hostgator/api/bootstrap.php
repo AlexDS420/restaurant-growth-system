@@ -123,10 +123,10 @@ function session_user(SupabaseRest $db): ?array
     $token = $_COOKIE['ros_access_token'] ?? ''; if (!is_string($token) || strlen($token) < 20) return null;
     try { $auth = $db->authUser($token); } catch (ApiException) { return null; }
     $id = (string)($auth['id'] ?? ''); if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) return null;
-    $members = $db->query('organization_members', ['user_id' => 'eq.' . rawurlencode($id), 'active' => 'eq.true', 'select' => 'organization_id,role', 'limit' => '1']);
+    $members = $db->query('ros_organization_members', ['user_id' => 'eq.' . rawurlencode($id), 'active' => 'eq.true', 'select' => 'organization_id,role', 'limit' => '1']);
     if (!$members) return null;
-    $venues = $db->query('venues', ['organization_id' => 'eq.' . rawurlencode((string)$members[0]['organization_id']), 'status' => 'eq.active', 'select' => 'id,name,slug,organization_id', 'limit' => '1']);
-    return ['id' => $id, 'email' => $auth['email'] ?? '', 'name' => $auth['user_metadata']['name'] ?? ($auth['email'] ?? ''), 'role' => $members[0]['role'], 'venue_id' => $venues[0]['id'] ?? null, 'active' => true];
+    $ros_venues = $db->query('ros_venues', ['organization_id' => 'eq.' . rawurlencode((string)$members[0]['organization_id']), 'status' => 'eq.active', 'select' => 'id,name,slug,organization_id', 'limit' => '1']);
+    return ['id' => $id, 'email' => $auth['email'] ?? '', 'name' => $auth['user_metadata']['name'] ?? ($auth['email'] ?? ''), 'role' => $members[0]['role'], 'venue_id' => $ros_venues[0]['id'] ?? null, 'active' => true];
 }
 function require_session(SupabaseRest $db): array { $user = session_user($db); if (!$user) throw new ApiException(401, 'UNAUTHENTICATED', 'Inicia sesión para continuar.'); return $user; }
 function csrf_token(): string
