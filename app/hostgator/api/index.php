@@ -73,13 +73,82 @@ try {
     }
     if ($method === 'POST' && $path === '/api/v1/auth/logout') { require_csrf(); setcookie('ros_access_token', '', ['expires'=>time()-3600, 'httponly'=>true, 'samesite'=>'Lax', 'path'=>'/']); session_destroy(); respond(['logged_out'=>true]); }
     if ($method === 'GET' && $path === '/api/v1/me') { respond(['user' => require_session($db)]); }
+    if ($method === 'GET' && $path === '/api/v1/orders') {
+        $user = require_role($db, ['owner', 'manager', 'kitchen', 'cashier', 'viewer']);
+        $query = $_GET;
+        $allowedStatuses = ['pending', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'];
+        $allowedPayments = ['unpaid', 'pending', 'paid', 'failed', 'refunded', 'partially_refunded'];
+        $allowedFulfillment = ['pickup', 'delivery'];
+        $params = [
+            'venue_id' => 'eq.' . rawurlencode((string)$user['venue_id']),
+            'select' => 'id,venue_id,public_token,customer_name,customer_phone,customer_email,status,payment_status,fulfillment_type,address,reference,notes,subtotal_minor,tax_minor,discount_minor,delivery_fee_minor,total_minor,currency,placed_at,updated_at',
+            'order' => 'placed_at.desc',
+            'limit' => '200',
+        ];
+        foreach ([['status', $allowedStatuses], ['payment', $allowedPayments], ['fulfillment', $allowedFulfillment]] as [$key, $allowed]) {
+            if (!isset($query[$key]) || $query[$key] === '') continue;
+            $value = trim((string)$query[$key]);
+            if (!in_array($value, $allowed, true)) throw new ApiException(422, 'FILTER_INVALID', "El filtro {$key} no es válido.");
+            $column = $key === 'payment' ? 'payment_status' : ($key === 'fulfillment' ? 'fulfillment_type' : $key);
+            $params[$column] = 'eq.' . rawurlencode($value);
+        }
+        $date = trim((string)($query['date'] ?? ''));
+        if ($date !== '') {
+            $tz = new DateTimeZone('America/Lima'); $now = new DateTimeImmutable('now', $tz);
+            if ($date === 'today') { $from = $now->setTime(0, 0); $to = $from->modify('+1 day'); }
+            elseif ($date === 'yesterday') { $to = $now->setTime(0, 0); $from = $to->modify('-1 day'); }
+            elseif ($date === 'week') { $from = $now->modify('-7 days'); $to = null; }
+            else throw new ApiException(422, 'FILTER_INVALID', 'El filtro date no es válido.');
+            $fromIso = $from->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
+            if ($to !== null) {
+                $toIso = $to->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
+                $params['and'] = '(placed_at.gte.' . $fromIso . ',placed_at.lt.' . $toIso . ')';
+            } else $params['placed_at'] = 'gte.' . $fromIso;
+        }
+        $term = trim((string)($query['q'] ?? ''));
+        if ($term !== '') {
+            if (mb_strlen($term) > 80 || preg_match('/[^\\p{L}\\p{N} @.\\-_+]/u', $term)) throw new ApiException(422, 'FILTER_INVALID', 'La búsqueda contiene caracteres no permitidos.');
+            $wildcard = '*' . $term . '*';
+            $params['or'] = '(customer_name.ilike.' . $wildcard . ',customer_phone.ilike.' . $wildcard . ')';
+        }
+        $orders = $db->query('ros_orders', $params);
+        if (!$orders) { respond([]); }
+        $ids = array_values(array_filter(array_map(static fn(array $row): string => (string)($row['id'] ?? ''), $orders), static fn(string $id): bool => preg_match('/^[0-9a-f-]{36}$/i', $id) === 1));
+        $itemsByOrder = [];
+        if ($ids) {
+            $items = $db->query('ros_order_items', [
+                'order_id' => 'in.(' . implode(',', array_map('rawurlencode', $ids)) . ')',
+                'select' => 'order_id,name_snapshot,quantity,unit_price_minor,line_total_minor,options_snapshot,notes',
+            ]);
+            foreach ($items as $item) {
+                $snapshot = $item['options_snapshot'] ?? [];
+                if (is_string($snapshot)) $snapshot = json_decode($snapshot, true) ?: [];
+                $itemsByOrder[(string)$item['order_id']][] = [
+                    'name' => $item['name_snapshot'] ?? '', 'qty' => (int)($item['quantity'] ?? 0),
+                    'unit_price_minor' => (int)($item['unit_price_minor'] ?? 0), 'line_total_minor' => (int)($item['line_total_minor'] ?? 0),
+                    'options' => is_array($snapshot) ? $snapshot : [], 'notes' => $item['notes'] ?? null,
+                ];
+            }
+        }
+        $result = array_map(static function (array $order) use ($itemsByOrder): array {
+            $id = (string)$order['id'];
+            $order['customer'] = ['name' => $order['customer_name'] ?? '', 'phone' => $order['customer_phone'] ?? '', 'email' => $order['customer_email'] ?? null];
+            $order['totals'] = ['subtotal_minor'=>(int)($order['subtotal_minor'] ?? 0), 'tax_minor'=>(int)($order['tax_minor'] ?? 0), 'discount_minor'=>(int)($order['discount_minor'] ?? 0), 'delivery_fee_minor'=>(int)($order['delivery_fee_minor'] ?? 0), 'total_minor'=>(int)($order['total_minor'] ?? 0), 'currency'=>$order['currency'] ?? 'PEN'];
+            $order['items'] = $itemsByOrder[$id] ?? [];
+            unset($order['customer_name'], $order['customer_phone'], $order['customer_email'], $order['subtotal_minor'], $order['tax_minor'], $order['discount_minor'], $order['delivery_fee_minor'], $order['total_minor']);
+            return $order;
+        }, $orders);
+        respond($result);
+    }
     if ($method === 'POST' && preg_match('#^/api/v1/payments/([^/]+)/confirm$#', $path, $m)) {
-        require_csrf(); $user = require_session($db); if (!in_array($user['role'], ['owner','manager','cashier'], true)) throw new ApiException(403, 'FORBIDDEN', 'No tienes permiso para confirmar pagos.'); $body = json_body(); $status = ($body['status'] ?? '') === 'rejected' ? 'rejected' : 'confirmed';
+        require_csrf(); $user = require_role($db, ['owner','manager','cashier']); $body = json_body(); $status = (string)($body['status'] ?? '');
+        if (!in_array($status, ['confirmed', 'rejected'], true)) throw new ApiException(422, 'STATUS_INVALID', 'El estado de conciliación no es válido.');
         $rows = $db->update('ros_payments', ['id' => 'eq.' . rawurlencode($m[1]), 'venue_id' => 'eq.' . rawurlencode((string)$user['venue_id']), 'status' => 'eq.verifying'], ['status' => $status, 'confirmed_by' => $user['id'], 'confirmed_at' => gmdate('c'), 'failure_reason' => $status === 'rejected' ? substr((string)($body['note'] ?? ''), 0, 500) : null]);
         if (!$rows) throw new ApiException(409, 'PAYMENT_ALREADY_VERIFIED', 'El pago ya fue conciliado.');
         $payment = $rows[0] ?? []; if (!empty($payment['order_id'])) $db->update('ros_orders', ['id' => 'eq.' . rawurlencode((string)$payment['order_id']), 'venue_id' => 'eq.' . rawurlencode((string)$user['venue_id'])], ['payment_status' => $status === 'confirmed' ? 'paid' : 'failed']);
+        $db->insert('ros_audit_logs', ['venue_id'=>$user['venue_id'], 'actor_user_id'=>$user['id'], 'action'=>'payment.' . $status, 'entity_type'=>'payment', 'entity_id'=>$payment['id'] ?? $m[1], 'after_data'=>['status'=>$status, 'order_id'=>$payment['order_id'] ?? null]]);
         respond($payment);
     }
-    if ($method === 'GET' && $path === '/api/v1/payments/reconciliation') { $user = require_session($db); $rows = $db->query('ros_payments', ['venue_id'=>'eq.'.rawurlencode((string)$user['venue_id']), 'method'=>'in.(yape,plin)', 'select'=>'id,order_id,method,provider,amount_minor,operation_code,external_ref,status,created_at,confirmed_at', 'order'=>'created_at.desc']); respond(['payments'=>$rows, 'pending_count'=>count(array_filter($rows, static fn(array $r): bool => ($r['status'] ?? '') === 'verifying'))]); }
+    if ($method === 'GET' && $path === '/api/v1/payments/reconciliation') { $user = require_role($db, ['owner','manager','cashier']); $rows = $db->query('ros_payments', ['venue_id'=>'eq.'.rawurlencode((string)$user['venue_id']), 'method'=>'in.(yape,plin)', 'select'=>'id,order_id,method,provider,amount_minor,operation_code,external_ref,status,created_at,confirmed_at,failure_reason', 'order'=>'created_at.desc', 'limit'=>'200']); respond(['payments'=>$rows, 'pending_count'=>count(array_filter($rows, static fn(array $r): bool => ($r['status'] ?? '') === 'verifying'))]); }
     throw new ApiException(404, 'NOT_FOUND', 'Ruta no encontrada.');
 } catch (ApiException $e) { fail($e); } catch (Throwable $e) { error_log($e->getMessage()); fail(new ApiException(500, 'INTERNAL_ERROR', 'Ocurrió un error interno.')); }

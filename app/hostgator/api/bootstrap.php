@@ -129,6 +129,14 @@ function session_user(SupabaseRest $db): ?array
     return ['id' => $id, 'email' => $auth['email'] ?? '', 'name' => $auth['user_metadata']['name'] ?? ($auth['email'] ?? ''), 'role' => $members[0]['role'], 'venue_id' => $ros_venues[0]['id'] ?? null, 'active' => true];
 }
 function require_session(SupabaseRest $db): array { $user = session_user($db); if (!$user) throw new ApiException(401, 'UNAUTHENTICATED', 'Inicia sesión para continuar.'); return $user; }
+function require_role(SupabaseRest $db, array $roles): array
+{
+    $user = require_session($db);
+    if (!in_array((string)($user['role'] ?? ''), $roles, true) || empty($user['venue_id'])) {
+        throw new ApiException(403, 'FORBIDDEN', 'No tienes permiso para realizar esta acción.');
+    }
+    return $user;
+}
 function csrf_token(): string
 {
     if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
