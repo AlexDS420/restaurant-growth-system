@@ -3,7 +3,7 @@
 -- rol anon no pueda leer datos internos. Las pruebas de allow/deny con usuarios
 -- de dos organizaciones deben agregarse al fixture del entorno piloto.
 begin;
-select plan(4);
+select plan(6);
 
 select ok(
   (select relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -22,6 +22,8 @@ select ok(
 set local role anon;
 select throws_ok($$select count(*) from public.organizations$$, '42501', 'anon no tiene grant para organizaciones');
 select throws_ok($$select count(*) from public.payments$$, '42501', 'anon no tiene grant para pagos');
+select throws_ok($$select count(*) from public.receipts$$, '42501', 'anon no tiene grant para comprobantes futuros');
+select throws_ok($$select count(*) from public.complaints$$, '42501', 'anon no tiene grant para reclamos futuros');
 
 select * from finish();
 rollback;

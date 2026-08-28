@@ -9,6 +9,8 @@ La migración `migrations/20260827000100_restaurant_core.sql` define el núcleo 
 - estados `pending`, `verifying`, `confirmed`, `rejected`, `expired`, `refunded` y `partially_refunded`;
 - eventos de proveedor idempotentes y bitácora de auditoría.
 
+La migración posterior `migrations/20260827000200_future_compliance.sql` deja preparados, pero **no habilitados**, `receipts` y `complaints` para comprobantes electrónicos y Libro de Reclamaciones. Son módulos feature-gated: requieren configurar un PSE/OSE, validación de CDR/correlativos, políticas de conservación y pruebas legales/operativas antes de encenderlos.
+
 ## Configuración segura
 
 1. Aplicar la migración con Supabase CLI o SQL Editor en un proyecto de prueba antes de producción.
@@ -29,4 +31,5 @@ La base registra comprobante/código (`operation_code`), importe esperado, méto
 - No reemplaza el BFF Node actual: es la base de la migración progresiva hacia PHP + Supabase.
 - La escritura de auditoría desde el backend debe implementarse como operación controlada y append-only.
 - Debe añadirse una suite `supabase/tests/` con pruebas allow/deny para cada tabla antes de declarar producción.
+- Antes de activar comprobantes o Libro de Reclamaciones deben añadirse fixtures y pruebas de plazos, correlativos, CDR, estados, permisos de caja/administración y acceso público exclusivamente a través del BFF.
 - El frontend público debe consultar solo filas publicadas mediante el BFF o la API con las políticas anon descritas.

@@ -23,8 +23,30 @@ try {
         $body = json_body(); $slug = rawurldecode($m[1]); $venues = $db->query('venues', ['slug' => 'eq.' . rawurlencode($slug), 'status' => 'eq.active', 'select' => 'id,name,slug,currency', 'limit' => '1']);
         if (!$venues) throw new ApiException(404, 'VENUE_NOT_FOUND', 'No encontramos este negocio.');
         $items = $body['items'] ?? null; if (!is_array($items) || count($items) < 1 || count($items) > 50) throw new ApiException(422, 'ITEMS_INVALID', 'El pedido debe tener entre 1 y 50 productos.');
-        $order = $db->insert('orders', ['venue_id' => $venues[0]['id'], 'customer_name' => require_string($body, 'customer_name'), 'customer_phone' => require_string($body, 'customer_phone', 40), 'fulfillment_type' => in_array($body['fulfillment_type'] ?? 'pickup', ['pickup','delivery'], true) ? $body['fulfillment_type'] : 'pickup', 'status' => 'pending', 'payment_status' => 'unpaid', 'notes' => substr((string)($body['order_notes'] ?? ''), 0, 1000), 'currency' => 'PEN']);
-        respond($order[0] ?? $order, 201);
+        $venueId = (string)$venues[0]['id']; $idempotency = trim((string)($body['idempotency_key'] ?? ''));
+        if ($idempotency !== '' && strlen($idempotency) <= 120) {
+            $existing = $db->query('orders', ['venue_id'=>'eq.'.rawurlencode($venueId), 'idempotency_key'=>'eq.'.rawurlencode($idempotency), 'select'=>'*', 'limit'=>'1']);
+            if ($existing) respond($existing[0]);
+        }
+        $productIds = array_values(array_unique(array_map(static fn($item): string => (string)($item['product_id'] ?? ''), $items)));
+        if (count($productIds) !== count(array_filter($productIds, static fn(string $id): bool => preg_match('/^[0-9a-f-]{36}$/i', $id) === 1))) throw new ApiException(422, 'PRODUCT_ID_INVALID', 'Uno de los productos no es válido.');
+        $products = $db->query('menu_products', ['venue_id'=>'eq.'.rawurlencode($venueId), 'id'=>'in.(' . implode(',', array_map('rawurlencode', $productIds)) . ')', 'is_visible'=>'eq.true', 'is_available'=>'eq.true', 'deleted_at'=>'is.null', 'select'=>'id,name,price_minor,promo_price_minor']);
+        $byId = []; foreach ($products as $product) $byId[(string)$product['id']] = $product;
+        if (count($byId) !== count($productIds)) throw new ApiException(422, 'PRODUCT_UNAVAILABLE', 'Uno de los productos ya no está disponible.');
+        $subtotal = 0; $rows = [];
+        foreach ($items as $item) {
+            $productId = (string)($item['product_id'] ?? ''); $qty = filter_var($item['quantity'] ?? 0, FILTER_VALIDATE_INT);
+            if ($qty === false || $qty < 1 || $qty > 99) throw new ApiException(422, 'QUANTITY_INVALID', 'La cantidad de un producto no es válida.');
+            $product = $byId[$productId]; $unit = (int)($product['promo_price_minor'] ?? 0) > 0 ? (int)$product['promo_price_minor'] : (int)$product['price_minor']; $line = $unit * $qty; $subtotal += $line;
+            $rows[] = ['venue_id'=>$venueId, 'product_id'=>$productId, 'name_snapshot'=>$product['name'], 'unit_price_minor'=>$unit, 'quantity'=>$qty, 'line_total_minor'=>$line, 'options_snapshot'=>is_array($item['option_ids'] ?? null) ? $item['option_ids'] : [], 'notes'=>substr((string)($item['notes'] ?? ''), 0, 500)];
+        }
+        $fulfillment = $body['fulfillment'] ?? []; $type = (string)($fulfillment['type'] ?? 'pickup'); if (!in_array($type, ['pickup','delivery'], true)) throw new ApiException(422, 'FULFILLMENT_INVALID', 'Método de entrega no válido.');
+        if ($type === 'delivery' && trim((string)($fulfillment['address'] ?? '')) === '') throw new ApiException(422, 'ADDRESS_REQUIRED', 'La dirección es obligatoria para delivery.');
+        $fee = 0; $tax = intdiv($subtotal * 18, 100); $total = $subtotal + $tax + $fee;
+        $customer = $body['customer'] ?? []; if (!is_array($customer)) $customer = [];
+        $orderRows = $db->insert('orders', ['venue_id'=>$venueId, 'public_token'=>bin2hex(random_bytes(18)), 'customer_name'=>require_string(['customer_name'=>$customer['name'] ?? ''], 'customer_name'), 'customer_phone'=>require_string(['customer_phone'=>$customer['phone'] ?? ''], 'customer_phone', 40), 'customer_email'=>filter_var((string)($customer['email'] ?? ''), FILTER_VALIDATE_EMAIL) ?: null, 'fulfillment_type'=>$type, 'address'=>substr((string)($fulfillment['address'] ?? ''), 0, 300), 'reference'=>substr((string)($fulfillment['reference'] ?? ''), 0, 200), 'status'=>'pending', 'payment_status'=>'unpaid', 'notes'=>substr((string)($body['notes'] ?? ''), 0, 1000), 'subtotal_minor'=>$subtotal, 'tax_minor'=>$tax, 'delivery_fee_minor'=>$fee, 'total_minor'=>$total, 'currency'=>'PEN', 'idempotency_key'=>$idempotency !== '' ? $idempotency : null]);
+        $order = $orderRows[0] ?? []; if (empty($order['id'])) throw new ApiException(502, 'ORDER_CREATE_FAILED', 'No se pudo crear el pedido.'); foreach ($rows as &$row) $row['order_id'] = $order['id']; unset($row); $db->insert('order_items', $rows[0]); foreach (array_slice($rows, 1) as $row) $db->insert('order_items', $row);
+        $order['totals'] = ['subtotal_minor'=>$subtotal, 'tax_minor'=>$tax, 'delivery_fee_minor'=>$fee, 'total_minor'=>$total]; respond($order, 201);
     }
     if ($method === 'POST' && preg_match('#^/api/v1/public/venues/([^/]+)/orders/([^/]+)/pay$#', $path, $m)) {
         $body = json_body(); $methodName = strtolower(trim((string)($body['payment_method'] ?? '')));
