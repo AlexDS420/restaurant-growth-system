@@ -5,5 +5,9 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: { proxy: { '/api': 'http://localhost:3000' } },
-  build: { sourcemap: false, target: 'es2022' },
+  build: {
+    sourcemap: false,
+    target: 'es2022',
+    rollupOptions: { input: { main: 'index.html', admin: 'admin.html' } },
+  },
 });
