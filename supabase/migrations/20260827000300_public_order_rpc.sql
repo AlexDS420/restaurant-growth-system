@@ -90,3 +90,27 @@ revoke all on function public.ros_create_public_order(text, jsonb) from public, 
 revoke all on function public.ros_register_public_payment(text, text, text) from public, authenticated;
 grant execute on function public.ros_create_public_order(text, jsonb) to anon;
 grant execute on function public.ros_register_public_payment(text, text, text) to anon;
+
+create or replace function public.ros_confirm_payment(p_payment_id uuid, p_status text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_payment ros_payments%rowtype;
+  v_user uuid := auth.uid();
+begin
+  if v_user is null or p_status not in ('confirmed', 'rejected') then raise exception 'PAYMENT_CONFIRM_INVALID'; end if;
+  update ros_payments p set status = p_status, confirmed_by = v_user, confirmed_at = now(), failure_reason = case when p_status = 'rejected' then 'Rechazado por operador' else null end, updated_at = now()
+  where p.id = p_payment_id and p.status = 'verifying' and exists (select 1 from ros_venues v join ros_organization_members m on m.organization_id = v.organization_id where v.id = p.venue_id and m.user_id = v_user and m.active and m.role in ('owner','manager','cashier'))
+  returning p.* into v_payment;
+  if not found then raise exception 'PAYMENT_NOT_ALLOWED'; end if;
+  update ros_orders set payment_status = case when p_status = 'confirmed' then 'paid' else 'failed' end, updated_at = now() where id = v_payment.order_id;
+  insert into ros_audit_logs (venue_id, actor_user_id, action, entity_type, entity_id, after_data) values (v_payment.venue_id, v_user, 'payment.' || p_status, 'payment', v_payment.id, jsonb_build_object('status', p_status, 'order_id', v_payment.order_id));
+  return jsonb_build_object('payment_id', v_payment.id, 'status', v_payment.status, 'order_id', v_payment.order_id);
+end;
+$$;
+
+revoke all on function public.ros_confirm_payment(uuid, text) from public, anon;
+grant execute on function public.ros_confirm_payment(uuid, text) to authenticated;
