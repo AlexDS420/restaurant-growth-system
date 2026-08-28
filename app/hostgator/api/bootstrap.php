@@ -12,7 +12,13 @@ function env_value(string $key, ?string $default = null): ?string
 {
     static $loaded = false;
     if (!$loaded) {
-        $candidates = array_filter([getenv('BFF_ENV_FILE') ?: null, dirname(__DIR__) . '/.env', dirname(__DIR__, 2) . '/private/.env', dirname(__DIR__, 2) . '/hostgator/.env']);
+        $candidates = array_filter([
+            getenv('BFF_ENV_FILE') ?: null,
+            dirname(__DIR__) . '/.env',
+            dirname(__DIR__, 2) . '/private/.env',
+            dirname(__DIR__, 2) . '/private/restaurant-cron/.env',
+            dirname(__DIR__, 2) . '/hostgator/.env',
+        ]);
         $file = null;
         foreach ($candidates as $candidate) if (is_readable($candidate)) { $file = $candidate; break; }
         if ($file !== null) {

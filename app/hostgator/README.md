@@ -5,7 +5,7 @@ Este BFF está pensado para un plan básico de HostGator: PHP 8.1+, HTTPS, cPane
 ## Instalación
 
 1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en un proyecto Supabase de prueba y luego `hostgator/supabase/004_outbox_events.sql` para habilitar la cola del cron.
-2. Copia `hostgator/.env.example` a un archivo `.env` fuera de `public_html` cuando sea posible.
+2. Copia `hostgator/.env.example` a `/home2/aebfbbmi/private/restaurant-cron/.env` (fuera de `public_html`) en el despliegue de producción. El BFF también admite `BFF_ENV_FILE` para una ruta alternativa.
 3. Configura `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor PHP. Nunca incluyas la `service_role` en `public/`, Vite o JavaScript.
 4. Publica `api/` detrás de HTTPS y activa `api/.htaccess`.
 5. Configura el frontend para consumir `/api/v1`.
@@ -33,7 +33,7 @@ Ejecuta `supabase/004_outbox_events.sql` en Supabase. Configura `OUTBOX_WEBHOOK_
 Cron recomendado cada minuto:
 
 ```cron
-* * * * * /usr/local/bin/php /home/USUARIO/restaurant-growth/app/hostgator/cron/process_outbox.php >> /home/USUARIO/logs/restaurant-outbox.log 2>&1
+* * * * * /usr/local/bin/php /home2/aebfbbmi/private/restaurant-cron/cron/process_outbox.php >> /home2/aebfbbmi/logs/restaurant-outbox.log 2>&1
 ```
 
 El worker reclama hasta 25 eventos pendientes, usa `X-Idempotency-Key` con el UUID del evento, aplica reintentos exponenciales hasta 8 intentos y mueve los eventos agotados a `dead_letter`. Un estado `failed` queda programado para reintento; `sent` es terminal. El servicio receptor debe tratar el header de idempotencia como único para evitar envíos duplicados.
@@ -46,10 +46,10 @@ La prueba local sin secretos se ejecuta desde `app/` con `php tests/bff-contract
 
 ## cPanel cron
 
-Mantén `cron/` fuera de `public_html` y programa, por ejemplo, cada 5 minutos:
+Mantén `cron/` fuera de `public_html`. En este despliegue la ruta es `/home2/aebfbbmi/private/restaurant-cron/cron/`; programa, por ejemplo, cada 5 minutos:
 
 ```text
-*/5 * * * * /usr/local/bin/php /home/USUARIO/restaurant/hostgator/cron/reconcile_payments.php >> /home/USUARIO/logs/payments.log 2>&1
+*/5 * * * * /usr/local/bin/php /home2/aebfbbmi/private/restaurant-cron/cron/reconcile_payments.php >> /home2/aebfbbmi/logs/payments.log 2>&1
 ```
 
 `expire_pending.php` queda en dry-run hasta definir el SLA comercial. Los cron no sustituyen un webhook oficial ni una conciliación bancaria; solo procesan pendientes y dejan evidencia operativa.
