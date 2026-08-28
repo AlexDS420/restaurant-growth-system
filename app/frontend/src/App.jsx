@@ -2,12 +2,36 @@ import { useEffect, useMemo, useState } from 'react';
 
 const slug = import.meta.env.VITE_VENUE_SLUG || 'casa-aurora';
 const money = (minor = 0) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(minor / 100);
+const publicConfig = window.__ROS_CONFIG__ || {};
+const directEnabled = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(String(publicConfig.supabaseUrl || '')) && String(publicConfig.supabaseAnonKey || '').length > 20 && !String(publicConfig.supabaseAnonKey).startsWith('TU_');
 
 async function getJson(path) {
   const response = await fetch(path, { headers: { Accept: 'application/json' } });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error?.message || 'No pudimos cargar el menú.');
   return body.data;
+}
+
+async function directJson(path, options = {}) {
+  if (!directEnabled) throw new Error('BFF_UNAVAILABLE');
+  const response = await fetch(`${publicConfig.supabaseUrl}/rest/v1${path}`, { ...options, headers: { Accept: 'application/json', apikey: publicConfig.supabaseAnonKey, Authorization: `Bearer ${publicConfig.supabaseAnonKey}`, ...(options.headers || {}) } });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.message || body.error_description || 'SUPABASE_UNAVAILABLE');
+  return body;
+}
+
+async function loadPublicData() {
+  try { return await Promise.all([getJson(`/api/v1/public/venues/${slug}`), getJson(`/api/v1/public/venues/${slug}/menu`)]); } catch (bffError) {
+    if (!directEnabled) throw bffError;
+    const venues = await directJson(`/ros_venues?slug=eq.${encodeURIComponent(slug)}&status=eq.active&is_published=eq.true&select=*`);
+    if (!venues[0]) throw bffError;
+    const venue = venues[0];
+    const [categories, products] = await Promise.all([
+      directJson(`/ros_menu_categories?venue_id=eq.${venue.id}&is_visible=eq.true&order=sort_order.asc`),
+      directJson(`/ros_menu_products?venue_id=eq.${venue.id}&is_visible=eq.true&is_available=eq.true&deleted_at=is.null&order=sort_order.asc`)
+    ]);
+    return [{ ...venue, is_open: venue.status === 'active' }, { venue, categories: categories.map((category) => ({ ...category, products: products.filter((product) => product.category_id === category.id) })), option_groups: [] }];
+  }
 }
 
 export default function App() {
@@ -22,7 +46,7 @@ export default function App() {
 
   const load = () => {
     setLoading(true); setError('');
-    Promise.all([getJson(`/api/v1/public/venues/${slug}`), getJson(`/api/v1/public/venues/${slug}/menu`)]).then(([v, m]) => { setVenue(v); setMenu(m); }).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    loadPublicData().then(([v, m]) => { setVenue(v); setMenu(m); }).catch((e) => setError(e.message)).finally(() => setLoading(false));
   };
   useEffect(load, []);
 
@@ -35,15 +59,29 @@ export default function App() {
     const method = String(form.get('method'));
     const operationCode = String(form.get('operation_code') || '').trim();
     const body = { customer: { name: form.get('name'), phone: form.get('phone'), email: form.get('email') || null }, fulfillment: { type: 'pickup' }, notes: '', items: cart.map((item) => ({ product_id: item.id, quantity: item.qty, option_ids: [] })), idempotency_key: crypto.randomUUID() };
-    const response = await fetch(`/api/v1/public/venues/${slug}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error?.message || 'No pudimos registrar tu pedido.');
-    let order = data.data;
+    let order;
+    try {
+      const response = await fetch(`/api/v1/public/venues/${slug}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error?.message || 'No pudimos registrar tu pedido.');
+      order = data.data;
+    } catch (bffError) {
+      if (!directEnabled) throw bffError;
+      const rpc = await directJson('/rpc/ros_create_public_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_slug: slug, p_payload: body }) });
+      order = Array.isArray(rpc) ? rpc[0] : rpc;
+    }
     if ((method === 'yape' || method === 'plin') && operationCode) {
-      const payResponse = await fetch(`/api/v1/public/venues/${slug}/orders/${order.public_token}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ payment_method: method, operation_code: operationCode }) });
-      const payData = await payResponse.json().catch(() => ({}));
-      if (!payResponse.ok) throw new Error(payData.error?.message || 'No pudimos registrar el pago.');
-      order = { ...order, payment_status: payData.data?.payment_status || 'pending_verification' };
+      try {
+        const payResponse = await fetch(`/api/v1/public/venues/${slug}/orders/${order.public_token}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ payment_method: method, operation_code: operationCode }) });
+        const payData = await payResponse.json().catch(() => ({}));
+        if (!payResponse.ok) throw new Error(payData.error?.message || 'No pudimos registrar el pago.');
+        order = { ...order, payment_status: payData.data?.payment_status || 'pending_verification' };
+      } catch (bffError) {
+        if (!directEnabled) throw bffError;
+        const rpc = await directJson('/rpc/ros_register_public_payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_public_token: order.public_token, p_method: method, p_operation_code: operationCode }) });
+        const payment = Array.isArray(rpc) ? rpc[0] : rpc;
+        order = { ...order, payment_status: payment.payment_status || 'pending_verification' };
+      }
     }
     setSubmitted({ ...order, method, operationCode }); setCart([]); setCheckout(false);
   };

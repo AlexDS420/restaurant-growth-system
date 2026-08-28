@@ -25,7 +25,8 @@ cat > "$OUT/README-CPANEL.md" <<'EOF'
 3. Copia `private/.env.example` a `private/.env` y completa Supabase y el webhook HTTPS. No subas ese `.env` al repositorio.
 4. Ejecuta las migraciones Supabase antes de recibir pedidos. El núcleo usa tablas `ros_*` para no colisionar con otros sistemas del proyecto.
 5. Configura el cron con la ruta absoluta de `private/cron/process_outbox.php`.
-6. Comprueba HTTPS, `/api/v1/healthz` (si está habilitado) y un pedido de prueba en PEN. El paquete actual publica el storefront React; el panel administrativo legacy requiere una pasada de migración BFF separada.
+6. Edita `public_html/restaurant-config.js` y coloca únicamente `supabaseUrl` y la clave `anon` pública del proyecto. Nunca pegues aquí `service_role`.
+7. Comprueba HTTPS, la carga del menú y un pedido de prueba en PEN. En planes que bloquean HTTPS saliente desde PHP, el storefront usa Supabase REST/RPC directo con RLS; el panel `/admin.html` requiere conectividad PHP→Supabase o un proxy permitido por el hosting.
 EOF
 
 # La lista evita que archivos de desarrollo o secretos lleguen al hosting.

@@ -125,10 +125,10 @@ try {
         if ($ids) {
             $items = $db->query('ros_order_items', [
                 'order_id' => 'in.(' . implode(',', array_map('rawurlencode', $ids)) . ')',
-                'select' => 'order_id,name_snapshot,quantity,unit_price_minor,line_total_minor,options_snapshot,notes',
+                'select' => 'order_id,name_snapshot,quantity,unit_price_minor,line_total_minor,ros_options_snapshot,notes',
             ]);
             foreach ($items as $item) {
-                $snapshot = $item['options_snapshot'] ?? [];
+                $snapshot = $item['ros_options_snapshot'] ?? [];
                 if (is_string($snapshot)) $snapshot = json_decode($snapshot, true) ?: [];
                 $itemsByOrder[(string)$item['order_id']][] = [
                     'name' => $item['name_snapshot'] ?? '', 'qty' => (int)($item['quantity'] ?? 0),
