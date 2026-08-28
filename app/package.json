@@ -8,6 +8,7 @@
     "start": "node server/server.js",
     "dev": "NODE_ENV=development node --watch server/server.js",
     "test": "node --test",
+    "test:bff": "php tests/bff-contract-test.php",
     "seed": "node server/seed.js",
     "backup": "bash scripts/backup.sh",
     "rollback": "bash scripts/rollback.sh",
