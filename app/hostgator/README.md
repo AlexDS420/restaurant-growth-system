@@ -1,0 +1,37 @@
+# BFF PHP para HostGator + Supabase
+
+Este BFF está pensado para un plan básico de HostGator: PHP 8.1+, HTTPS, cPanel y Supabase como base de datos. El frontend Vite se publica como archivos estáticos y consume `/api/v1`.
+
+## Instalación
+
+1. Ejecuta `../../supabase/migrations/20260827000100_restaurant_core.sql` en un proyecto Supabase de prueba (la migración `app/hostgator/supabase/003_yape_plin_payments.sql` es solo compatibilidad histórica y no debe ejecutarse sobre el core actual).
+2. Copia `hostgator/.env.example` a un archivo `.env` fuera de `public_html` cuando sea posible.
+3. Configura `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor PHP. Nunca los incluyas en `public/`, Vite o JavaScript.
+4. Publica `api/` detrás de HTTPS y activa `api/.htaccess`.
+5. Configura el frontend para consumir `/api/v1`.
+
+El endpoint público de pago acepta exclusivamente `yape` o `plin`, guarda el código de operación y lo deja en estado `pending` para revisión autorizada. Una captura no confirma un pago. Un usuario `owner`, `manager` o `cashier` puede confirmar o rechazar mediante `POST /api/v1/payments/{id}/confirm` con `X-CSRF-Token`.
+
+## Contrato mínimo
+
+- `GET /api/v1/public/venues/{slug}`
+- `GET /api/v1/public/venues/{slug}/menu`
+- `POST /api/v1/public/venues/{slug}/orders`
+- `POST /api/v1/public/venues/{slug}/orders/{public_token}/pay`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/me`
+- `POST /api/v1/payments/{id}/confirm`
+- `GET /api/v1/payments/reconciliation`
+
+El BFF rechaza JSON inválido, usa cookies HttpOnly/SameSite, sesiones con hash, CSRF en mutaciones autenticadas, errores JSON uniformes, límites de campos y separación de secretos. Antes de declarar producción se debe probar el esquema en Supabase, HTTPS, RLS, backups, cPanel, restauración y un piloto real de Lima.
+
+## cPanel cron
+
+Mantén `cron/` fuera de `public_html` y programa, por ejemplo, cada 5 minutos:
+
+```text
+*/5 * * * * /usr/local/bin/php /home/USUARIO/restaurant/hostgator/cron/reconcile_payments.php >> /home/USUARIO/logs/payments.log 2>&1
+```
+
+`expire_pending.php` queda en dry-run hasta definir el SLA comercial. Los cron no sustituyen un webhook oficial ni una conciliación bancaria; solo procesan pendientes y dejan evidencia operativa.

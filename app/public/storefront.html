@@ -324,18 +324,22 @@ function renderPayment(token) {
     <h3>Pagar pedido #${esc(state.order.order_number || state.order.id)}</h3>
     <div class="split" style="margin-bottom:14px"><span class="muted">Total a pagar</span><span class="num" style="font-size:22px;font-weight:600">${fmtMoney(state.order.totals.total_minor)}</span></div>
     <form id="pay-form">
-      <div class="field"><label for="pay-last4">Últimos 4 dígitos de la tarjeta</label><input class="input" id="pay-last4" name="card_last4" maxlength="4" minlength="4" inputmode="numeric" autocomplete="off" pattern="[0-9]{4}" placeholder="Ej. 4242…" required aria-describedby="pay-help"></div>
-      <div class="field"><label for="pay-brand">Marca</label><select class="input" id="pay-brand" name="card_brand" autocomplete="cc-type" required><option value="visa">Visa</option><option value="mastercard">Mastercard</option></select></div>
-      <button class="btn btn-accent btn-lg btn-block" type="submit" id="pay-go">Pagar ahora</button>
-      <p class="help" id="pay-help" style="margin-top:10px">Demo segura: no se almacena ningún dato de tarjeta. Con 0001 el pago declina; con 9999 simulas una caída del proveedor.</p>
+      <fieldset class="field" style="border:0;padding:0"><legend style="font-size:13px;font-weight:500;margin-bottom:6px">Elige tu medio de pago</legend>
+        <label class="checkline"><input type="radio" name="payment_method" value="yape" checked> <span>Yape</span></label>
+        <label class="checkline"><input type="radio" name="payment_method" value="plin"> <span>Plin</span></label>
+      </fieldset>
+      <div class="card card-tight" style="margin:12px 0"><strong>Cómo pagar</strong><p class="help" style="margin:6px 0 0">Envía el monto exacto al QR o número que te indique el restaurante. Luego registra el código de operación que aparece en tu app.</p></div>
+      <div class="field"><label for="pay-operation">Código de operación</label><input class="input" id="pay-operation" name="operation_code" maxlength="80" inputmode="text" autocomplete="off" placeholder="Ej. 123456" required aria-describedby="pay-help"></div>
+      <button class="btn btn-accent btn-lg btn-block" type="submit" id="pay-go">Registrar pago</button>
+      <p class="help" id="pay-help" style="margin-top:10px">Tu pedido quedará pendiente de verificación por caja. Una captura por sí sola no confirma el pago.</p>
     </form>`, { title: '' });
   const btn = m.body.querySelector('#pay-go');
   m.body.querySelector('#pay-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     btn.classList.add('loading'); btn.disabled = true;
     try {
-      const res = await api(`/public/venues/${slug}/orders/${token}/pay`, { method: 'POST', body: { card_last4: m.body.querySelector('#pay-last4').value, card_brand: m.body.querySelector('#pay-brand').value } });
-      m.close(); state.order = res.order; renderTracking();
+      const res = await api(`/public/venues/${slug}/orders/${token}/pay`, { method: 'POST', body: { payment_method: m.body.querySelector('input[name="payment_method"]:checked').value, operation_code: m.body.querySelector('#pay-operation').value.trim() } });
+      m.close(); state.order = { ...state.order, ...(res.order || {}), payment_status: res.payment_status || 'pending' }; renderTracking();
     } catch (err) {
       if (err.code === 'PAYMENT_DECLINED' || err.code === 'PROVIDER_UNAVAILABLE') { toast(err.message, 'err'); m.close(); renderPayment(token); }
       else { toast(err.message, 'err'); btn.classList.remove('loading'); btn.disabled = false; }
