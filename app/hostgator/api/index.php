@@ -6,7 +6,14 @@ try {
     $method = request_method(); $path = request_path();
     if ($method === 'GET' && $path === '/api/v1/healthz') {
         $configured = trim((string)env_value('SUPABASE_URL', '')) !== '' && trim((string)env_value('SUPABASE_SERVICE_ROLE_KEY', '')) !== '';
-        respond(['status' => $configured ? 'ready' : 'degraded', 'supabase_configured' => $configured], $configured ? 200 : 503);
+        if (!$configured) respond(['status' => 'degraded', 'supabase_configured' => false, 'supabase_reachable' => false], 503);
+        try {
+            $healthDb = SupabaseRest::fromEnv();
+            $healthDb->query('ros_venues', ['select' => 'id', 'limit' => '1']);
+            respond(['status' => 'ready', 'supabase_configured' => true, 'supabase_reachable' => true], 200);
+        } catch (ApiException $error) {
+            respond(['status' => 'degraded', 'supabase_configured' => true, 'supabase_reachable' => false, 'diagnostic' => $error->errorCode], 503);
+        }
     }
     $db = SupabaseRest::fromEnv();
     if ($method === 'GET' && preg_match('#^/api/v1/public/venues/([^/]+)/menu$#', $path, $m)) {
