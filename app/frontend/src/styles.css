@@ -1,3 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pine: #14231d;
+  --color-porcelain: #f2f4ef;
+  --color-saffron: #d78a16;
+  --color-sage: #b5c0b8;
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
 :root { font-family: Inter, system-ui, sans-serif; color: #14231d; background: #f2f4ef; }
 * { box-sizing: border-box; } body { margin: 0; } button, input { font: inherit; } button { cursor: pointer; border: 0; border-radius: 999px; padding: .8rem 1rem; background: #d78a16; color: #14231d; font-weight: 700; } button:focus-visible, input:focus-visible { outline: 3px solid #176b5a; outline-offset: 3px; }
 .shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 8rem; } .hero { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 2rem; background: #14231d; color: #f2f4ef; border-radius: 1.5rem; } h1, h2 { margin: .25rem 0 .75rem; letter-spacing: -.04em; } h1 { font-size: clamp(2.5rem, 8vw, 5rem); } h2 { font-size: 1.25rem; } p { line-height: 1.5; } .eyebrow { font: .72rem/1.2 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; opacity: .75; } .cover { font-size: 4rem; }
