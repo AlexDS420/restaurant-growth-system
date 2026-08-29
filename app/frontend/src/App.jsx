@@ -1,99 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 
 const slug = import.meta.env.VITE_VENUE_SLUG || 'casa-aurora';
-const money = (minor = 0) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(minor / 100);
+const money = (minor = 0) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 }).format(Number(minor || 0) / 100).replace('PEN', 'S/');
 const publicConfig = window.__ROS_CONFIG__ || {};
 const directEnabled = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(String(publicConfig.supabaseUrl || '')) && String(publicConfig.supabaseAnonKey || '').length > 20 && !String(publicConfig.supabaseAnonKey).startsWith('TU_');
-
-async function getJson(path) {
-  const response = await fetch(path, { headers: { Accept: 'application/json' } });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error?.message || 'No pudimos cargar el menú.');
-  return body.data;
+async function api(path, options = {}) { const response = await fetch(path, { ...options, headers: { Accept: 'application/json', ...(options.headers || {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error?.message || 'No pudimos conectar con el restaurante.'); return body.data; }
+async function direct(path, options = {}) { if (!directEnabled) throw new Error('BFF_UNAVAILABLE'); const response = await fetch(`${publicConfig.supabaseUrl}/rest/v1${path}`, { ...options, headers: { Accept: 'application/json', apikey: publicConfig.supabaseAnonKey, Authorization: `Bearer ${publicConfig.supabaseAnonKey}`, ...(options.headers || {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message || body.error_description || 'Supabase no está disponible.'); return body; }
+async function loadData() { try { return await Promise.all([api(`/api/v1/public/venues/${slug}`), api(`/api/v1/public/venues/${slug}/menu`)]); } catch (error) { if (!directEnabled) throw error; const venues = await direct(`/ros_venues?slug=eq.${encodeURIComponent(slug)}&status=eq.active&is_published=eq.true&select=*`); if (!venues[0]) throw error; const venue = venues[0]; const [categories, products] = await Promise.all([direct(`/ros_menu_categories?venue_id=eq.${venue.id}&is_visible=eq.true&order=sort_order.asc`), direct(`/ros_menu_products?venue_id=eq.${venue.id}&is_visible=eq.true&is_available=eq.true&deleted_at=is.null&order=sort_order.asc`)]); return [{ ...venue, is_open: venue.status === 'active' }, { venue, categories: categories.map((c) => ({ ...c, products: products.filter((p) => p.category_id === c.id) })), option_groups: [] }]; }
 }
-
-async function directJson(path, options = {}) {
-  if (!directEnabled) throw new Error('BFF_UNAVAILABLE');
-  const response = await fetch(`${publicConfig.supabaseUrl}/rest/v1${path}`, { ...options, headers: { Accept: 'application/json', apikey: publicConfig.supabaseAnonKey, Authorization: `Bearer ${publicConfig.supabaseAnonKey}`, ...(options.headers || {}) } });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message || body.error_description || 'SUPABASE_UNAVAILABLE');
-  return body;
-}
-
-async function loadPublicData() {
-  try { return await Promise.all([getJson(`/api/v1/public/venues/${slug}`), getJson(`/api/v1/public/venues/${slug}/menu`)]); } catch (bffError) {
-    if (!directEnabled) throw bffError;
-    const venues = await directJson(`/ros_venues?slug=eq.${encodeURIComponent(slug)}&status=eq.active&is_published=eq.true&select=*`);
-    if (!venues[0]) throw bffError;
-    const venue = venues[0];
-    const [categories, products] = await Promise.all([
-      directJson(`/ros_menu_categories?venue_id=eq.${venue.id}&is_visible=eq.true&order=sort_order.asc`),
-      directJson(`/ros_menu_products?venue_id=eq.${venue.id}&is_visible=eq.true&is_available=eq.true&deleted_at=is.null&order=sort_order.asc`)
-    ]);
-    return [{ ...venue, is_open: venue.status === 'active' }, { venue, categories: categories.map((category) => ({ ...category, products: products.filter((product) => product.category_id === category.id) })), option_groups: [] }];
-  }
-}
+const readCart = () => { try { return JSON.parse(localStorage.getItem(`ros_cart_${slug}`) || '[]'); } catch { return []; } };
 
 export default function App() {
-  const [venue, setVenue] = useState(null);
-  const [menu, setMenu] = useState(null);
-  const [query, setQuery] = useState('');
-  const [cart, setCart] = useState([]);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [checkout, setCheckout] = useState(false);
-  const [submitted, setSubmitted] = useState(null);
-
-  const load = () => {
-    setLoading(true); setError('');
-    loadPublicData().then(([v, m]) => { setVenue(v); setMenu(m); }).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  };
-  useEffect(load, []);
-
-  const products = useMemo(() => (menu?.categories || []).flatMap((category) => (category.products || []).map((product) => ({ ...product, category: category.name }))).filter((product) => `${product.name} ${product.description || ''}`.toLowerCase().includes(query.toLowerCase())), [menu, query]);
-  const add = (product) => setCart((items) => { const found = items.find((item) => item.id === product.id); return found ? items.map((item) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item) : [...items, { ...product, qty: 1 }]; });
-  const total = cart.reduce((sum, item) => sum + item.price_minor * item.qty, 0);
-  const submitOrder = async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const method = String(form.get('method'));
-    const operationCode = String(form.get('operation_code') || '').trim();
-    const body = { customer: { name: form.get('name'), phone: form.get('phone'), email: form.get('email') || null }, fulfillment: { type: 'pickup' }, notes: '', items: cart.map((item) => ({ product_id: item.id, quantity: item.qty, option_ids: [] })), idempotency_key: crypto.randomUUID() };
-    let order;
-    try {
-      const response = await fetch(`/api/v1/public/venues/${slug}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error?.message || 'No pudimos registrar tu pedido.');
-      order = data.data;
-    } catch (bffError) {
-      if (!directEnabled) throw bffError;
-      const rpc = await directJson('/rpc/ros_create_public_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_slug: slug, p_payload: body }) });
-      order = Array.isArray(rpc) ? rpc[0] : rpc;
-    }
-    if ((method === 'yape' || method === 'plin') && operationCode) {
-      try {
-        const payResponse = await fetch(`/api/v1/public/venues/${slug}/orders/${order.public_token}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ payment_method: method, operation_code: operationCode }) });
-        const payData = await payResponse.json().catch(() => ({}));
-        if (!payResponse.ok) throw new Error(payData.error?.message || 'No pudimos registrar el pago.');
-        order = { ...order, payment_status: payData.data?.payment_status || 'pending_verification' };
-      } catch (bffError) {
-        if (!directEnabled) throw bffError;
-        const rpc = await directJson('/rpc/ros_register_public_payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_public_token: order.public_token, p_method: method, p_operation_code: operationCode }) });
-        const payment = Array.isArray(rpc) ? rpc[0] : rpc;
-        order = { ...order, payment_status: payment.payment_status || 'pending_verification' };
-      }
-    }
-    setSubmitted({ ...order, method, operationCode }); setCart([]); setCheckout(false);
-  };
-
-  if (loading) return <main className="shell"><p className="eyebrow">RESTAURANT OS · LIMA</p><h1>Cargando carta…</h1></main>;
-  if (error) return <main className="shell"><p className="eyebrow">NO DISPONIBLE</p><h1>No pudimos abrir este menú</h1><p>{error}</p><button onClick={load}>Reintentar</button></main>;
-  return <main className="shell">
-    <header className="hero"><div><p className="eyebrow">{venue.city || 'Lima'} · {venue.is_open ? 'ABIERTO' : 'CERRADO'}</p><h1>{venue.name}</h1><p>{venue.address || 'Pide para recojo o delivery.'}</p></div><div className="cover" aria-hidden="true">{venue.cover_emoji || '🍽️'}</div></header>
-    <label className="search">Buscar en la carta<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ceviche, lomo…" /></label>
-    <section className="grid" aria-live="polite">{products.map((product) => <article className="card" key={product.id}><div><p className="eyebrow">{product.category}</p><h2>{product.name}</h2><p>{product.description}</p><strong>{money(product.promo_price_minor || product.price_minor)}</strong></div><button onClick={() => add(product)} aria-label={`Agregar ${product.name}`}>Agregar</button></article>)}</section>
-    {submitted && <section className="notice" role="status"><strong>Pedido recibido</strong><p>Guarda tu código: <b>{submitted.order?.public_token || submitted.public_token || 'registrado'}</b>. {submitted.method === 'yape' || submitted.method === 'plin' ? `Verificaremos tu ${submitted.method.toUpperCase()} con el código ${submitted.operationCode || 'pendiente'}.` : 'Te contactaremos para coordinar.'}</p></section>}
-    {checkout && <section className="checkout" aria-labelledby="checkout-title"><h2 id="checkout-title">Confirmar pedido</h2><form onSubmit={(event) => { submitOrder(event).catch((e) => setError(e.message)); }}><label>Nombre<input name="name" required autoComplete="name" /></label><label>Celular<input name="phone" required inputMode="tel" autoComplete="tel" placeholder="987 654 321" /></label><label>Correo (opcional)<input name="email" type="email" autoComplete="email" /></label><label>Forma de pago<select name="method" defaultValue="yape"><option value="yape">Yape</option><option value="plin">Plin</option><option value="cash">Efectivo al recoger</option></select></label><label>Código de operación (si ya pagaste)<input name="operation_code" inputMode="numeric" /></label><div className="actions"><button type="button" onClick={() => setCheckout(false)}>Volver</button><button className="primary" type="submit">Enviar pedido · {money(total)}</button></div></form></section>}
-    <aside className="cart" aria-label="Tu pedido"><div><strong>{cart.reduce((sum, item) => sum + item.qty, 0)} productos</strong><span>{money(total)}</span></div>{cart.map((item) => <div className="cart-row" key={item.id}><span>{item.qty} × {item.name}</span><span>{money(item.price_minor * item.qty)}</span></div>)}{cart.length > 0 && <button className="primary" onClick={() => setCheckout(true)}>Continuar al pedido</button>}</aside>
+  const [venue, setVenue] = useState(null); const [menu, setMenu] = useState(null); const [query, setQuery] = useState(''); const [category, setCategory] = useState('all'); const [cart, setCart] = useState(readCart); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [checkout, setCheckout] = useState(false); const [submitted, setSubmitted] = useState(null); const [submitting, setSubmitting] = useState(false);
+  const load = () => { setLoading(true); setError(''); loadData().then(([v, m]) => { setVenue(v); setMenu(m); }).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
+  useEffect(load, []); useEffect(() => localStorage.setItem(`ros_cart_${slug}`, JSON.stringify(cart)), [cart]);
+  const categories = menu?.categories || [];
+  const products = useMemo(() => categories.flatMap((c) => (c.products || []).map((p) => ({ ...p, category: c.name, categoryId: c.id }))).filter((p) => (category === 'all' || String(p.categoryId) === String(category)) && `${p.name} ${p.description || ''}`.toLowerCase().includes(query.toLowerCase().trim())), [categories, category, query]);
+  const totalItems = cart.reduce((n, i) => n + i.qty, 0); const total = cart.reduce((n, i) => n + Number(i.unit_price_minor || i.price_minor || 0) * i.qty, 0);
+  const add = (p) => setCart((items) => { const unit = p.promo_price_minor && p.promo_price_minor < p.price_minor ? p.promo_price_minor : p.price_minor; const found = items.find((i) => i.id === p.id); return found ? items.map((i) => i.id === p.id ? { ...i, qty: i.qty + 1 } : i) : [...items, { ...p, unit_price_minor: unit, qty: 1 }]; });
+  const changeQty = (id, delta) => setCart((items) => items.map((i) => i.id === id ? { ...i, qty: i.qty + delta } : i).filter((i) => i.qty > 0));
+  const submitOrder = async (event) => { event.preventDefault(); if (!localStorage.getItem('ros_customer_access_token')) { const returnPath = `${location.pathname}${location.search}`; location.href = `/login.html?role=customer&return=${encodeURIComponent(returnPath)}`; return; } setSubmitting(true); setError(''); try { const form = new FormData(event.currentTarget); const method = String(form.get('method')); const operationCode = String(form.get('operation_code') || '').trim(); if ((method === 'yape' || method === 'plin') && !operationCode) throw new Error('Ingresa el código de operación de tu pago.'); const body = { customer: { name: form.get('name'), phone: form.get('phone'), email: form.get('email') || null }, fulfillment: { type: 'pickup' }, notes: String(form.get('notes') || ''), items: cart.map((i) => ({ product_id: i.id, quantity: i.qty, option_ids: [] })), idempotency_key: crypto.randomUUID() }; let order; try { order = await api(`/api/v1/public/venues/${slug}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); } catch (e) { if (!directEnabled) throw e; const result = await direct('/rpc/ros_create_public_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_slug: slug, p_payload: body }) }); order = Array.isArray(result) ? result[0] : result; } if (method === 'yape' || method === 'plin') { try { const payment = await api(`/api/v1/public/venues/${slug}/orders/${order.public_token}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_method: method, operation_code: operationCode }) }); order = { ...order, payment_status: payment.payment_status || 'pending_verification' }; } catch (e) { if (!directEnabled) throw e; const result = await direct('/rpc/ros_register_public_payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_public_token: order.public_token, p_method: method, p_operation_code: operationCode }) }); const payment = Array.isArray(result) ? result[0] : result; order = { ...order, payment_status: payment.payment_status || 'pending_verification' }; } } setSubmitted({ ...order, method, operationCode, customerName: form.get('name') }); setCart([]); setCheckout(false); } catch (e) { setError(e.message); } finally { setSubmitting(false); } };
+  if (loading) return <main className="loading-screen"><span className="brand-mark">RO</span><p>Preparando la carta…</p></main>; if (error && !menu) return <main className="loading-screen"><span className="brand-mark">RO</span><p className="error-text">{error}</p><button onClick={load}>Intentar nuevamente</button></main>;
+  return <main className="app-shell"><header className="topbar"><a className="wordmark" href="/" aria-label="Restaurant OS, inicio"><span className="wordmark-dot" />Restaurant OS</a><div className="topbar-meta"><span className={`open-pill ${venue?.is_open ? 'is-open' : ''}`}><i />{venue?.is_open ? 'Abierto ahora' : 'Cerrado'}</span><span className="city-label">{venue?.city || 'Lima, Perú'}</span></div></header>
+    <section className="venue-hero"><div><p className="eyebrow">Menú digital · {venue?.city || 'Lima'}</p><h1>{venue?.name || 'Tu restaurante favorito'}</h1><p className="venue-address">{venue?.address || 'Pide para recojo en el local.'}</p><div className="hero-tags"><span>✦ Hecho al momento</span><span>⌁ Recojo en local</span></div></div><div className="hero-emblem" aria-hidden="true">{venue?.cover_emoji || '🍽️'}</div></section>
+    {submitted && <section className="customer-dashboard" aria-labelledby="order-dashboard-title"><div className="dashboard-head"><div><p className="eyebrow">Panel de tu pedido</p><h2 id="order-dashboard-title">¡Listo, {submitted.customerName}!</h2></div><span className="status-chip">En revisión</span></div><div className="order-code"><span>Código de seguimiento</span><strong>{submitted.public_token || submitted.order?.public_token || 'Registrado'}</strong></div><div className="progress-track" aria-label="Estado del pedido"><span className="progress-step active"><b>01</b>Recibido</span><span className="progress-line" /><span className="progress-step active"><b>02</b>Confirmando</span><span className="progress-line muted" /><span className="progress-step"><b>03</b>Listo para recoger</span></div><p className="dashboard-note">{submitted.method === 'yape' || submitted.method === 'plin' ? `Registramos tu ${submitted.method.toUpperCase()} con código ${submitted.operationCode}. El local validará el abono antes de preparar tu pedido.` : 'El local recibió tu pedido y te contactará para coordinar el recojo.'}</p><button className="text-button" onClick={() => setSubmitted(null)}>Volver a la carta</button></section>}
+    <section className="menu-section" id="menu"><div className="section-heading"><div><p className="eyebrow">Carta de hoy</p><h2>Elige tus favoritos</h2></div><span className="item-count">{products.length} opciones</span></div><div className="menu-tools"><div className="search-wrap"><span aria-hidden="true">⌕</span><label htmlFor="menu-search" className="sr-only">Buscar en la carta</label><input id="menu-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar un plato…" /></div><div className="category-list" role="tablist" aria-label="Categorías"><button className={category === 'all' ? 'category active' : 'category'} onClick={() => setCategory('all')} role="tab" aria-selected={category === 'all'}>Todo</button>{categories.map((c) => <button key={c.id} className={String(category) === String(c.id) ? 'category active' : 'category'} onClick={() => setCategory(c.id)} role="tab" aria-selected={String(category) === String(c.id)}>{c.name}</button>)}</div></div><div className="product-grid" aria-live="polite">{products.map((p) => { const price = p.promo_price_minor && p.promo_price_minor < p.price_minor ? p.promo_price_minor : p.price_minor; return <article className="product-card" key={p.id}><div className="product-art" aria-hidden="true">{p.emoji || '✦'}</div><div className="product-info"><p className="product-category">{p.category}</p><h3>{p.name}</h3><p className="product-description">{p.description || 'Preparado con ingredientes seleccionados.'}</p><div className="product-footer"><strong>{money(price)}</strong>{p.promo_price_minor && p.promo_price_minor < p.price_minor && <del>{money(p.price_minor)}</del>}<button className="add-button" onClick={() => add(p)} aria-label={`Agregar ${p.name}`}>+</button></div></div></article>; })}</div>{!products.length && <div className="empty-menu"><span>⌕</span><h3>No encontramos ese plato</h3><p>Prueba con otra búsqueda o categoría.</p></div>}</section>
+    {error && menu && <p className="inline-error" role="alert">{error}</p>}{cart.length > 0 && <aside className="cart-dock" aria-label="Resumen de tu pedido"><div className="cart-summary"><span className="cart-badge">{totalItems}</span><div><strong>Tu pedido</strong><small>{totalItems} {totalItems === 1 ? 'producto' : 'productos'}</small></div><strong className="cart-total">{money(total)}</strong></div><button className="cart-cta" onClick={() => setCheckout(true)}>Revisar pedido <span>→</span></button></aside>}
+    {checkout && <div className="modal-backdrop"><section className="checkout-panel" role="dialog" aria-modal="true" aria-labelledby="checkout-title"><button className="close-button" onClick={() => setCheckout(false)} aria-label="Cerrar">×</button><p className="eyebrow">Último paso</p><h2 id="checkout-title">Confirma tu pedido</h2><div className="checkout-items">{cart.map((i) => <div className="checkout-item" key={i.id}><span>{i.qty} × {i.name}</span><span>{money(i.unit_price_minor * i.qty)}</span><div className="qty-controls"><button type="button" onClick={() => changeQty(i.id, -1)} aria-label={`Quitar ${i.name}`}>−</button><span>{i.qty}</span><button type="button" onClick={() => changeQty(i.id, 1)} aria-label={`Agregar ${i.name}`}>+</button></div></div>)}</div><form onSubmit={submitOrder}><div className="form-grid"><label>Nombre completo<input name="name" required autoComplete="name" placeholder="¿Cómo te llamamos?" /></label><label>Celular<input name="phone" required inputMode="tel" autoComplete="tel" placeholder="987 654 321" /></label></div><label>Correo <em>(opcional)</em><input name="email" type="email" autoComplete="email" placeholder="tu@correo.com" /></label><label>Forma de pago<select name="method" defaultValue="yape"><option value="yape">Yape</option><option value="plin">Plin</option><option value="cash">Efectivo al recoger</option></select></label><label>Código de operación <em>(requerido para Yape o Plin)</em><input name="operation_code" inputMode="numeric" placeholder="Código de tu comprobante" /></label><label>Nota para el local <em>(opcional)</em><textarea name="notes" rows="2" placeholder="Ej. sin cebolla…" /></label><div className="checkout-total"><span>Total estimado</span><strong>{money(total)}</strong></div><button className="submit-button" type="submit" disabled={submitting}>{submitting ? 'Enviando…' : 'Enviar pedido'} <span>→</span></button></form></section></div>}
   </main>;
 }
