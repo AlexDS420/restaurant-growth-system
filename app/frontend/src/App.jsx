@@ -6,7 +6,27 @@ const publicConfig = window.__ROS_CONFIG__ || {};
 const directEnabled = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(String(publicConfig.supabaseUrl || '')) && String(publicConfig.supabaseAnonKey || '').length > 20 && !String(publicConfig.supabaseAnonKey).startsWith('TU_');
 async function api(path, options = {}) { const response = await fetch(path, { ...options, headers: { Accept: 'application/json', ...(options.headers || {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error?.message || 'No pudimos conectar con el restaurante.'); return body.data; }
 async function direct(path, options = {}) { if (!directEnabled) throw new Error('BFF_UNAVAILABLE'); const response = await fetch(`${publicConfig.supabaseUrl}/rest/v1${path}`, { ...options, headers: { Accept: 'application/json', apikey: publicConfig.supabaseAnonKey, Authorization: `Bearer ${publicConfig.supabaseAnonKey}`, ...(options.headers || {}) } }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message || body.error_description || 'Supabase no está disponible.'); return body; }
-async function loadData() { try { return await Promise.all([api(`/api/v1/public/venues/${slug}`), api(`/api/v1/public/venues/${slug}/menu`)]); } catch (error) { if (!directEnabled) throw error; const venues = await direct(`/ros_venues?slug=eq.${encodeURIComponent(slug)}&status=eq.active&is_published=eq.true&select=*`); if (!venues[0]) throw error; const venue = venues[0]; const [categories, products] = await Promise.all([direct(`/ros_menu_categories?venue_id=eq.${venue.id}&is_visible=eq.true&order=sort_order.asc`), direct(`/ros_menu_products?venue_id=eq.${venue.id}&is_visible=eq.true&is_available=eq.true&deleted_at=is.null&order=sort_order.asc`)]); return [{ ...venue, is_open: venue.status === 'active' }, { venue, categories: categories.map((c) => ({ ...c, products: products.filter((p) => p.category_id === c.id) })), option_groups: [] }]; }
+async function loadDirectData() {
+  const venues = await direct(`/ros_venues?slug=eq.${encodeURIComponent(slug)}&status=eq.active&is_published=eq.true&select=*`);
+  if (!venues[0]) throw new Error('No encontramos este restaurante.');
+  const venue = venues[0];
+  const [categories, products] = await Promise.all([
+    direct(`/ros_menu_categories?venue_id=eq.${venue.id}&is_visible=eq.true&order=sort_order.asc`),
+    direct(`/ros_menu_products?venue_id=eq.${venue.id}&is_visible=eq.true&is_available=eq.true&deleted_at=is.null&order=sort_order.asc`),
+  ]);
+  return [{ ...venue, is_open: venue.status === 'active' }, { venue, categories: categories.map((c) => ({ ...c, products: products.filter((p) => p.category_id === c.id) })), option_groups: [] }];
+}
+async function loadData() {
+  // When the public Supabase config is available, load directly from the read-only
+  // API. This avoids waiting for a slow HostGator/PHP BFF before showing the menu.
+  // The BFF remains the fallback for local previews or degraded Supabase access.
+  if (directEnabled) {
+    try { return await loadDirectData(); } catch (directError) {
+      try { return await Promise.all([api(`/api/v1/public/venues/${slug}`), api(`/api/v1/public/venues/${slug}/menu`)]); }
+      catch { throw directError; }
+    }
+  }
+  return await Promise.all([api(`/api/v1/public/venues/${slug}`), api(`/api/v1/public/venues/${slug}/menu`)]);
 }
 const readCart = () => { try { return JSON.parse(localStorage.getItem(`ros_cart_${slug}`) || '[]'); } catch { return []; } };
 
