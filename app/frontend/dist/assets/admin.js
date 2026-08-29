@@ -44,9 +44,24 @@ function bindShell() {
 
 function labelRole(r) { return { owner: 'Dueño', manager: 'Gerente', kitchen: 'Cocina', cashier: 'Caja', marketing: 'Marketing', viewer: 'Solo lectura', platform_admin: 'Admin plataforma' }[r] || r; }
 
+// Lucide-style inline SVGs keep the icon language crisp without adding a runtime dependency.
+const NAV_ICONS = {
+  hoy: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  pedidos: '<path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
+  comanda: '<path d="M5 4h14M5 10h14M5 16h9"/><path d="M3 4h.01M3 10h.01M3 16h.01"/>',
+  menu: '<path d="M4 5h16M4 12h16M4 19h16"/>', inventario: '<path d="m3 7 9-4 9 4-9 4-9-4Z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/>',
+  clientes: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  reservas: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+  reseñas: '<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/>',
+  analitica: '<path d="M3 3v18h18"/><path d="m7 16 4-5 3 3 5-7"/>', promociones: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3.4 13.4a2 2 0 0 1 0-2.8l7.2-7.2a2 2 0 0 1 2.8 0l7.2 7.2a2 2 0 0 1 0 2.8Z"/><circle cx="8.5" cy="8.5" r="1"/>',
+  cupones: '<path d="M20 12a2 2 0 0 0 0-4V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3Z"/><path d="M9 8h.01M15 16h.01M9 16l6-8"/>',
+  facturacion: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 7h6M9 11h6M9 15h4"/>', equipo: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  auditoria: '<path d="M12 3 4 7v5c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V7l-8-4Z"/><path d="m9 12 2 2 4-4"/>', config: '<path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.1h-2.5V20a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1A1.7 1.7 0 0 0 8 15a1.7 1.7 0 0 0-1.6-1H6v-2.5h.4A1.7 1.7 0 0 0 8 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.1h2.5V5a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1V14H21a1.7 1.7 0 0 0-1.6 1Z"/>',
+};
+
 function navHtml() {
   return `<div class="sidebar-admin"><nav class="sidebar" aria-label="Navegación">
-    ${SECTIONS.filter(([id]) => state.me.user.permissions.includes(PERM[id])).map(([id, label]) => `<a href="?section=${id}" data-sec="${id}" ${state.sec === id ? 'class="active" aria-current="page"' : ''}>${label}</a>`).join('')}
+    <div class="sidebar-group"><span class="sidebar-group-label">Operación</span>${SECTIONS.filter(([id]) => state.me.user.permissions.includes(PERM[id])).map(([id, label]) => `<a href="?section=${id}" data-sec="${id}" ${state.sec === id ? 'class="active" aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${NAV_ICONS[id] || '<circle cx="12" cy="12" r="3"/>'}</svg></span><span>${label}</span></a>`).join('')}</div>
   </nav><main class="main" id="main"></main></div>`;
 }
 // Fallback de accesibilidad para formularios renderizados dinámicamente:
@@ -87,24 +102,33 @@ window.addEventListener('popstate', () => {
 /* ---------- HOY ---------- */
 async function rHoy() {
   main().innerHTML = skeletonRows(6);
-  const [an, ven] = await Promise.all([api('/analytics/summary?from=' + encodeURIComponent(new Date(Date.now() - 7 * 864e5).toISOString())), api('/venue')]);
+  const [an, ven, orders] = await Promise.all([api('/analytics/summary?from=' + encodeURIComponent(new Date(Date.now() - 7 * 864e5).toISOString())), api('/venue'), api('/orders?date=today')]);
   state.venue = ven;
   const t = an.today || {};
+  const topProducts = an.top_products || [];
+  const attention = an.attention || [];
+  const opportunities = an.opportunities || [];
+  const bars = (value) => Array.from({ length: 7 }, (_, i) => `<i style="height:${Math.max(18, Math.min(92, 20 + ((Number(value) || 0) % 29) + i * 10))}%"></i>`).join('');
+  const paymentTotal = (an.by_payment || []).reduce((sum, row) => sum + Number(row.n || 0), 0) || Number(t.n || 0);
+  const paidTotal = (an.by_payment || []).filter((row) => ['paid', 'refunded', 'partially_refunded'].includes(row.payment_status)).reduce((sum, row) => sum + Number(row.n || 0), 0);
+  const completion = paymentTotal ? Math.round((paidTotal / paymentTotal) * 100) : 0;
+  const recentOrders = orders || [];
   main().innerHTML = `
-    <div class="service-header"><div><div class="page-kicker">Centro de servicio</div><h1>Hoy en ${esc(ven.name)}</h1><p class="muted">${new Intl.DateTimeFormat('es-PE', { dateStyle: 'full' }).format(new Date())}</p></div><span class="badge ${ven.is_open ? 'ok' : 'warn'}">${ven.is_open ? 'Local abierto' : 'Fuera de horario'}</span></div>
-    <div class="grid grid-3" style="margin:24px 0">
-      ${metric('Ventas hoy', fmtMoney(t.revenue || 0), 'accent-value')}
-      ${metric('Pedidos hoy', t.n || 0)}
-      ${metric('Ticket promedio', fmtMoney(an.completed?.avg_ticket_minor || 0))}
-    </div>
-    <div class="grid grid-2">
-      <div class="card"><h4>Requiere tu atención</h4>${an.attention?.length ? an.attention.map((a) => `<p class="muted">• ${esc(a.message)}</p>`).join('') : '<p class="muted">Todo en orden ✅</p>'}</div>
-      <div class="card"><h4>Oportunidades</h4>${an.opportunities?.length ? an.opportunities.map((o) => `<p class="muted">• ${esc(o.message)}</p>`).join('') : '<p class="muted">Aún no hay suficiente data.</p>'}</div>
-    </div>
-    <div class="card" style="margin-top:20px"><h4>Completa tu configuración</h4>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:12px">
-        ${onboardingChips(ven.onboarding)}
-      </div></div>`;
+    <div class="dashboard-topbar"><div class="dashboard-search"><span aria-hidden="true">⌕</span><input id="dashboard-search" placeholder="Buscar en el panel…" aria-label="Buscar en el panel"><kbd>⌘ + Space</kbd></div><div class="dashboard-actions"><button type="button" aria-label="Cambiar tema">☼</button><button type="button" aria-label="Notificaciones">♧</button><span class="dashboard-user"><span class="dashboard-avatar">${esc((state.me.user.name || 'RO').slice(0, 2).toUpperCase())}</span><span><strong>${esc(state.me.user.name)}</strong><small>${esc(labelRole(state.me.user.role))}</small></span></span><button id="dashboard-logout" type="button" aria-label="Cerrar sesión">↪</button></div></div>
+    <section class="dashboard-hero"><div class="dashboard-hero-copy"><div class="page-kicker">Centro de servicio · ${esc(new Intl.DateTimeFormat('es-PE', { dateStyle: 'long' }).format(new Date()))}</div><h1>Resumen de ${esc(ven.name)}</h1><p>Una lectura rápida de la operación de tu restaurante para tomar decisiones a tiempo.</p></div><span class="hero-status ${ven.is_open ? 'is-open' : ''}"><i></i>${ven.is_open ? 'Local abierto' : 'Fuera de horario'}</span><div class="dashboard-kpis">
+      <div class="dashboard-kpi"><span class="kpi-icon">$</span><small>Ventas de hoy</small><strong>${fmtMoney(t.revenue || 0)}</strong><div class="kpi-bars">${bars(t.revenue)}</div></div>
+      <div class="dashboard-kpi"><span class="kpi-icon">◫</span><small>Pedidos recibidos</small><strong>${t.n || 0}</strong><div class="kpi-bars">${bars(t.n)}</div></div>
+      <div class="dashboard-kpi"><span class="kpi-icon">◌</span><small>Ticket promedio</small><strong>${fmtMoney(an.completed?.avg_ticket_minor || 0)}</strong><div class="kpi-bars">${bars(an.completed?.avg_ticket_minor)}</div></div>
+      <div class="dashboard-kpi"><span class="kpi-icon">✓</span><small>Pagos confirmados</small><strong>${completion}%</strong><div class="kpi-bars">${bars(completion)}</div></div>
+    </div></section>
+    <section class="dashboard-grid">
+      <article class="dashboard-card dashboard-performance"><div class="dashboard-card-heading"><h2>Rendimiento</h2><span>Últimos 7 días</span></div><div class="donut-chart" style="--donut-progress:${Math.max(8, Math.min(94, completion || 8))}%"><strong>${t.n || 0}</strong><small>pedidos hoy</small></div><div class="dashboard-legend"><span><i class="legend-red"></i>Confirmados <b>${paidTotal}</b></span><span><i class="legend-pink"></i>En proceso <b>${Math.max(0, paymentTotal - paidTotal)}</b></span></div></article>
+      <article class="dashboard-card dashboard-activity"><div class="dashboard-card-heading"><h2>Actividad reciente</h2><a href="?section=pedidos" data-sec="pedidos">Ver todo</a></div><div class="activity-list">${recentOrders.length ? recentOrders.slice(0, 4).map((o) => `<div class="activity-row"><span class="activity-avatar">${esc((o.customer?.name || 'P').slice(0, 1).toUpperCase())}</span><span><strong>Pedido #${o.id}</strong><small>${esc(o.customer?.name || 'Cliente')} · ${fmtClock(o.placed_at)}</small></span><b>${fmtMoney(o.totals?.total_minor || o.total_minor || 0)}</b></div>`).join('') : '<div class="dashboard-empty">No hay pedidos para mostrar hoy.</div>'}</div></article>
+      <article class="dashboard-card dashboard-insights"><div class="dashboard-card-heading"><h2>Señales del negocio</h2><span class="insight-pulse">● Activo</span></div><div class="insight-list">${[...attention, ...opportunities].slice(0, 4).map((item) => `<div class="insight-row"><span class="insight-icon">↗</span><p>${esc(item.message || 'Revisa la operación del local.')}</p></div>`).join('') || '<div class="insight-row"><span class="insight-icon">✓</span><p>Todo en orden. No hay alertas activas.</p></div>'}</div></article>
+    </section>
+    <section class="dashboard-table-card"><div class="dashboard-card-heading"><h2>Productos más vendidos</h2><a href="?section=analitica" data-sec="analitica">Ver analítica</a></div><div class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr><th>Producto</th><th>Unidades</th><th>Ingresos</th><th>Estado</th></tr></thead><tbody>${topProducts.length ? topProducts.slice(0, 5).map((p) => `<tr><td><span class="table-product-icon">✦</span><span class="table-product-name">${esc(p.name)}</span></td><td>${p.qty}</td><td>${fmtMoney(p.revenue)}</td><td><span class="table-status">Activo</span></td></tr>`).join('') : '<tr><td colspan="4" class="dashboard-empty">Todavía no hay ventas suficientes para ordenar productos.</td></tr>'}</tbody></table></div></section>`;
+  main().querySelectorAll('[data-sec]').forEach((a) => a.onclick = (e) => { e.preventDefault(); go(a.dataset.sec); });
+  el('dashboard-logout').onclick = $('#btn-logout').onclick;
 }
 function metric(label, value, cls = '') { return `<div class="card metric"><div class="label">${label}</div><div class="value ${cls} num">${value}</div></div>`; }
 function onboardingChips(o) {

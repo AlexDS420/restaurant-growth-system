@@ -8,13 +8,15 @@ function CustomerDashboard() {
   const [email, setEmail] = useState('');
   useEffect(() => { (async () => {
     const token = localStorage.getItem(tokenKey);
+    // El BFF usa una cookie HttpOnly; el valor local "bff" solo indica que
+    // debemos validar esa cookie mediante /api/v1/me, nunca decodificarlo.
     const bffSession = localStorage.getItem('ros_customer_session') === 'bff' || token === 'bff';
     if (!token && !bffSession) {
       location.href = '/login.html?role=customer&return=%2Fcliente.html';
       return;
     }
     try {
-      if (!token && bffSession) {
+      if (bffSession) {
         const response = await fetch('/api/v1/me', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
         const body = await response.json().catch(() => ({}));
         if (!response.ok || body.data?.user?.role !== 'customer') throw new Error('Sesión de cliente no válida.');
