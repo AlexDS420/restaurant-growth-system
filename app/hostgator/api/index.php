@@ -82,6 +82,16 @@ try {
         $user = session_user($db); if (!$user) throw new ApiException(403, 'NO_VENUE_ACCESS', 'Tu cuenta no tiene un restaurante activo asignado.');
         $_SESSION['csrf'] = bin2hex(random_bytes(32)); respond(['user' => $user, 'csrf_token' => $_SESSION['csrf']]);
     }
+    if ($method === 'POST' && $path === '/api/v1/auth/customer-login') {
+        $body = json_body(); $email = strtolower(trim(require_string($body, 'email', 254))); $password = (string)($body['password'] ?? '');
+        if ($password === '') throw new ApiException(422, 'PASSWORD_REQUIRED', 'Ingresa tu contraseña.');
+        $auth = $db->signIn($email, $password); $access = (string)($auth['access_token'] ?? '');
+        if ($access === '') throw new ApiException(401, 'INVALID_CREDENTIALS', 'Correo o contraseña incorrectos.');
+        setcookie('ros_access_token', $access, ['httponly'=>true, 'secure'=>!empty($_SERVER['HTTPS']), 'samesite'=>'Lax', 'path'=>'/', 'expires'=>time()+((int)($auth['expires_in'] ?? 3600))]);
+        $_COOKIE['ros_access_token'] = $access; $user = session_user($db);
+        if (!$user || ($user['role'] ?? '') !== 'customer') throw new ApiException(403, 'CUSTOMER_ACCESS_REQUIRED', 'Esta cuenta está vinculada a un restaurante.');
+        $_SESSION['csrf'] = bin2hex(random_bytes(32)); respond(['user' => $user, 'csrf_token' => $_SESSION['csrf']]);
+    }
     if ($method === 'POST' && $path === '/api/v1/auth/logout') { require_csrf(); setcookie('ros_access_token', '', ['expires'=>time()-3600, 'httponly'=>true, 'samesite'=>'Lax', 'path'=>'/']); session_destroy(); respond(['logged_out'=>true]); }
     if ($method === 'GET' && $path === '/api/v1/me') { respond(['user' => require_session($db)]); }
     if ($method === 'GET' && $path === '/api/v1/orders') {

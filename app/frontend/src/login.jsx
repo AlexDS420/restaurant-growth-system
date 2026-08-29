@@ -21,6 +21,18 @@ function Login() {
         }
         if (bffBody.error?.message) throw new Error(bffBody.error.message);
       }
+      if (role === 'customer') {
+        const bff = await fetch('./api/v1/auth/customer-login', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(credentials) });
+        const bffBody = await bff.json().catch(() => ({}));
+        if (bff.ok && bffBody.data?.user) {
+          localStorage.setItem('ros_customer_session', 'bff');
+          // Marcador local no sensible: el token real permanece en cookie HttpOnly.
+          localStorage.setItem('ros_customer_access_token', 'bff');
+          const requestedReturn = params.get('return'); const safeReturn = requestedReturn && requestedReturn.startsWith('/') && !requestedReturn.startsWith('//') ? requestedReturn : null;
+          location.href = safeReturn || './cliente.html'; return;
+        }
+        if (bffBody.error?.code === 'INVALID_CREDENTIALS' || bffBody.error?.code === 'CUSTOMER_ACCESS_REQUIRED') throw new Error(bffBody.error.message);
+      }
       if (!directEnabled) throw new Error('La configuración de acceso aún no está disponible.');
       const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: config.supabaseAnonKey }, body: JSON.stringify(credentials) });
       const body = await response.json().catch(() => ({})); if (!response.ok || !body.access_token) throw new Error('Correo o contraseña incorrectos.');

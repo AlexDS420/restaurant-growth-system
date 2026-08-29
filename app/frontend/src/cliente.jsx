@@ -6,23 +6,32 @@ const tokenKey = 'ros_customer_access_token';
 
 function CustomerDashboard() {
   const [email, setEmail] = useState('');
-  useEffect(() => {
+  useEffect(() => { (async () => {
     const token = localStorage.getItem(tokenKey);
-    if (!token) {
+    const bffSession = localStorage.getItem('ros_customer_session') === 'bff' || token === 'bff';
+    if (!token && !bffSession) {
       location.href = '/login.html?role=customer&return=%2Fcliente.html';
       return;
     }
     try {
+      if (!token && bffSession) {
+        const response = await fetch('/api/v1/me', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.data?.user?.role !== 'customer') throw new Error('Sesión de cliente no válida.');
+        setEmail(body.data.user.email || 'comensal'); return;
+      }
       const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
       setEmail(payload.email || 'comensal');
     } catch {
       localStorage.removeItem(tokenKey);
       location.href = '/login.html?role=customer&return=%2Fcliente.html';
     }
-  }, []);
+  })(); }, []);
 
   const logout = () => {
     localStorage.removeItem(tokenKey);
+    localStorage.removeItem('ros_customer_session');
+    fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
     location.href = '/';
   };
 

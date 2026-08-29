@@ -135,7 +135,7 @@ function session_user(SupabaseRest $db): ?array
     try { $auth = $db->authUser($token); } catch (ApiException) { return null; }
     $id = (string)($auth['id'] ?? ''); if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) return null;
     $members = $db->query('ros_organization_members', ['user_id' => 'eq.' . rawurlencode($id), 'active' => 'eq.true', 'select' => 'organization_id,role', 'limit' => '1']);
-    if (!$members) return null;
+    if (!$members) return ['id' => $id, 'email' => $auth['email'] ?? '', 'name' => $auth['user_metadata']['name'] ?? ($auth['email'] ?? ''), 'role' => 'customer', 'venue_id' => null, 'active' => true];
     $ros_venues = $db->query('ros_venues', ['organization_id' => 'eq.' . rawurlencode((string)$members[0]['organization_id']), 'status' => 'eq.active', 'select' => 'id,name,slug,organization_id', 'limit' => '1']);
     return ['id' => $id, 'email' => $auth['email'] ?? '', 'name' => $auth['user_metadata']['name'] ?? ($auth['email'] ?? ''), 'role' => $members[0]['role'], 'venue_id' => $ros_venues[0]['id'] ?? null, 'active' => true];
 }
