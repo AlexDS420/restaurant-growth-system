@@ -1,0 +1,20 @@
+/* FoodiPro shell for the complete operations panel. Module markup remains in
+   admin.js; this layer only maps the shared shell to the premium red system. */
+:root { --accent:#ed0b2d; --accent-hover:#bd061f; --accent-soft:#fff0f2; --ink:#17191e; --bg:#f3f3f6; --surface:#fff; --surface-muted:#f7f7f8; --border:#e1e1e6; }
+body { background:var(--bg); }
+.nav { border-top:0; border-bottom:1px solid #e4e4e9; }
+.nav-inner { max-width:1440px; padding:16px 34px; }
+.brand { color:#17191e; font-size:23px; letter-spacing:-.04em; }
+.brand span { color:var(--accent); }
+.sidebar-admin { max-width:1440px; min-height:calc(100vh - 66px); margin:0 auto; }
+.sidebar { width:258px; padding:30px 18px; background:linear-gradient(165deg,#800015,#210006 68%,#090a0d); border:0; }
+.sidebar a { padding:13px 17px; color:#f7dfe2; border-left:0; border-radius:11px; }
+.sidebar a.active { background:var(--accent); color:#fff; border-left:0; }
+.main { padding:38px clamp(24px,4vw,60px); }
+.main > h1, .main > h2 { color:#17191e; letter-spacing:-.055em; }
+.card { border-color:#e4e4e9; box-shadow:0 12px 35px #17191e0b; }
+.metric { border-top:4px solid var(--accent); }
+.metric .accent-value, .accent-value { color:var(--accent); }
+.btn-accent, .btn-accent:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+.page-kicker { color:var(--accent-hover); }
+@media (max-width:860px) { .sidebar { width:auto; padding:12px; } .sidebar-admin { min-height:0; } .main { padding:26px 18px 40px; } }
