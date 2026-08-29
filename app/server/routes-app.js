@@ -66,6 +66,23 @@ export function registerAppRoutes(app) {
     } catch (e) { const h = errToHttp(e); sendError(res, h.status, h.code, h.message); }
   });
 
+  // El preview local usa este mismo servidor como BFF. Mantener un endpoint
+  // explícito evita que el formulario de cliente caiga en la configuración
+  // pública de Supabase cuando se prueba sin un PHP local.
+  app.post('/api/v1/auth/customer-login', (req, res) => {
+    try {
+      const b = req.body || {};
+      const u = db.prepare('SELECT * FROM users WHERE email = ?').get(String(b.email || '').trim().toLowerCase());
+      if (!u || !verifyPassword(String(b.password || ''), u.password_hash)) return sendError(res, 401, 'INVALID_CREDENTIALS', 'Correo o contraseña incorrectos.');
+      if (!u.active) return sendError(res, 403, 'ACCOUNT_DISABLED', 'Tu cuenta está desactivada. Contacta al soporte.');
+      if (u.role !== 'customer') return sendError(res, 403, 'CUSTOMER_ACCESS_REQUIRED', 'Esta cuenta está vinculada a un restaurante.');
+      const token = createSession(db, u.id);
+      db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(nowISO(), u.id);
+      res.setHeader('Set-Cookie', sessionCookie(token));
+      sendOk(res, { user: { id: u.id, email: u.email, name: u.name, role: u.role, venue_id: u.venue_id } });
+    } catch (e) { const h = errToHttp(e); sendError(res, h.status, h.code, h.message); }
+  });
+
   app.post('/api/v1/auth/logout', (req, res) => {
     const cookie = req.headers.cookie || '';
     const m = cookie.match(/(?:^|;\s*)ros_session=([^;]+)/);

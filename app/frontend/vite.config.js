@@ -10,6 +10,9 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), legacyAdminAssets()],
   server: { proxy: { '/api': 'http://localhost:3000' } },
+  // `vite preview` no aplica `server.proxy`; conservar el mismo contrato BFF
+  // permite probar login y dashboard en localhost:4173.
+  preview: { proxy: { '/api': 'http://localhost:3000' } },
   build: {
     sourcemap: false,
     target: 'es2022',
