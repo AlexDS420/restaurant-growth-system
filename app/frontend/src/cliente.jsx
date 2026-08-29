@@ -26,18 +26,23 @@ function CustomerDashboard() {
     location.href = '/';
   };
 
-  return <div className="customer-shell">
-    <header className="customer-header">
-      <a className="foodipro-logo" href="/" aria-label="FoodiPro inicio"><span className="logo-tile">FP</span><span>Foodi<span>Pro</span></span></a>
-      <div className="customer-actions"><a className="customer-menu-link" href="/carta.html?venue=casa-aurora">Explorar carta <span>→</span></a><span className="customer-email">{email}</span><button className="quiet" onClick={logout}>Cerrar sesión</button></div>
+  const carta = '/carta.html?venue=casa-aurora';
+  return <div className="customer-shell foodie-customer">
+    <header className="customer-header foodie-customer-header">
+      <a className="foodipro-logo" href="/" aria-label="FoodiPro inicio"><span className="logo-tile">✦</span><span>Foodi<span>Pro</span></span></a>
+      <label className="customer-search"><span aria-hidden="true">⌕</span><span className="sr-only">Buscar</span><input placeholder="Buscar restaurantes o platos..." /></label>
+      <div className="customer-actions"><button className="customer-icon" type="button" aria-label="Cambiar tema">☼</button><button className="customer-icon" type="button" aria-label="Notificaciones">♧</button><a className="customer-account" href="#account" aria-label={`Cuenta de ${email}`}>◎ <span>{email ? email.split('@')[0] : 'Comensal'}</span></a><button className="quiet" onClick={logout}>Salir</button></div>
     </header>
-    <main className="customer-main">
-      <section className="customer-welcome"><div><p className="eyebrow accent">Tu espacio FoodiPro</p><h1>Hola, {email ? email.split('@')[0] : 'comensal'}.</h1><p>Descubre nuevos sabores, revisa tus pedidos y vuelve a pedir tus favoritos.</p><a className="customer-primary" href="/carta.html?venue=casa-aurora">Ver la carta <span>→</span></a></div><div className="customer-welcome-art" aria-hidden="true">🍔</div></section>
-      <section className="customer-dashboard-grid">
-        <article className="customer-panel customer-orders"><div className="section-heading"><div><p className="eyebrow">Actividad</p><h2>Mis pedidos</h2></div><a href="/carta.html?venue=casa-aurora">Nuevo pedido</a></div><div className="customer-empty"><span aria-hidden="true">⌁</span><h3>Aún no tienes pedidos</h3><p>Cuando realices tu primer pedido aparecerá aquí su estado y código de seguimiento.</p><a className="text-button" href="/carta.html?venue=casa-aurora">Explorar restaurantes →</a></div></article>
-        <aside className="customer-panel customer-side"><p className="eyebrow">Tu próxima comida</p><h2>Casa Aurora</h2><p>Menú digital · Lima, Perú</p><a className="customer-secondary" href="/carta.html?venue=casa-aurora">Ver carta</a></aside>
-      </section>
-    </main>
+    <div className="customer-layout">
+      <aside className="customer-sidebar" aria-label="Navegación del comensal"><a className="customer-side-icon active" href="#dashboard" aria-label="Inicio">▦</a><a className="customer-side-icon" href={carta} aria-label="Carta">♧</a><a className="customer-side-icon" href="#orders" aria-label="Mis pedidos">▤</a><a className="customer-side-icon" href="#favorites" aria-label="Favoritos">♡</a><a className="customer-side-icon" href={carta} aria-label="Carrito">▢</a></aside>
+      <main className="customer-main" id="dashboard">
+        <section className="customer-welcome foodie-customer-hero"><div className="customer-hero-copy"><p className="eyebrow accent">FoodiPro · Lima, Perú</p><h1>Vive para comer.<br /><em>No comas para vivir.</em></h1><p>Descubre sabores increíbles cerca de ti y disfruta cada pedido sin complicaciones.</p><a className="customer-primary" href={carta}>Explorar la carta <span>→</span></a></div><div className="customer-welcome-art" aria-hidden="true"><img src="/foodipro-customer-reference.webp" alt="" /></div></section>
+        <section className="customer-dashboard-grid foodie-customer-grid">
+          <div className="customer-main-column"><article className="customer-panel customer-categories"><div className="section-heading"><div><p className="eyebrow">Descubre</p><h2>Categorías</h2></div><a href={carta}>Ver todas <span>→</span></a></div><div className="customer-category-list"><a href={carta} className="customer-category"><span>🍩</span><strong>Postres</strong></a><a href={`${carta}&category=burger`} className="customer-category selected"><span>🍔</span><strong>Hamburguesas</strong></a><a href={carta} className="customer-category"><span>☕</span><strong>Bebidas</strong></a></div></article><article className="customer-panel customer-orders" id="orders"><div className="section-heading"><div><p className="eyebrow">Actividad</p><h2>Pedidos recientes</h2></div><a href={carta}>Nuevo pedido <span>→</span></a></div><div className="customer-empty"><span aria-hidden="true">⌁</span><h3>Aún no tienes pedidos</h3><p>Cuando realices tu primer pedido aparecerá aquí su estado y código de seguimiento.</p><a className="text-button" href={carta}>Explorar restaurantes →</a></div></article></div>
+          <aside className="customer-panel customer-side customer-order-summary"><p className="eyebrow">Tu resumen</p><h2>Tu pedido</h2><p className="customer-muted">Añade tus favoritos desde la carta.</p><div className="customer-balance"><span>Total actual</span><strong>S/ 0.00</strong></div><div className="customer-address"><span>⌖</span><div><strong>Casa Aurora</strong><small>Recojo · Lima, Perú</small></div></div><a className="customer-secondary" href={carta}>Ver carta <span>→</span></a></aside>
+        </section>
+      </main>
+    </div>
   </div>;
 }
 
