@@ -75,6 +75,10 @@ try {
         $auth = $db->signIn($email, $password); $access = (string)($auth['access_token'] ?? '');
         if ($access === '') throw new ApiException(401, 'INVALID_CREDENTIALS', 'Correo o contraseña incorrectos.');
         setcookie('ros_access_token', $access, ['httponly'=>true, 'secure'=>!empty($_SERVER['HTTPS']), 'samesite'=>'Lax', 'path'=>'/', 'expires'=>time()+((int)($auth['expires_in'] ?? 3600))]);
+        // setcookie() only adds a Set-Cookie response header; it does not update
+        // $_COOKIE during this request. Seed the request view so session_user()
+        // can validate the freshly-issued token before responding.
+        $_COOKIE['ros_access_token'] = $access;
         $user = session_user($db); if (!$user) throw new ApiException(403, 'NO_VENUE_ACCESS', 'Tu cuenta no tiene un restaurante activo asignado.');
         $_SESSION['csrf'] = bin2hex(random_bytes(32)); respond(['user' => $user, 'csrf_token' => $_SESSION['csrf']]);
     }
