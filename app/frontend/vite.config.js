@@ -11,6 +11,6 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: 'es2022',
-    rollupOptions: { input: { main: 'index.html', home: 'home.html', carta: 'carta.html', login: 'login.html', admin: 'admin.html', restaurante: 'restaurante.html' } },
+    rollupOptions: { input: { main: 'index.html', home: 'home.html', carta: 'carta.html', login: 'login.html', admin: 'admin.html', restaurante: 'restaurante.html', cliente: 'cliente.html' } },
   },
 });

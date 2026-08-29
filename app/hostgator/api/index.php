@@ -50,7 +50,7 @@ try {
             $productId = (string)($item['product_id'] ?? ''); $qty = filter_var($item['quantity'] ?? 0, FILTER_VALIDATE_INT);
             if ($qty === false || $qty < 1 || $qty > 99) throw new ApiException(422, 'QUANTITY_INVALID', 'La cantidad de un producto no es válida.');
             $product = $byId[$productId]; $unit = (int)($product['promo_price_minor'] ?? 0) > 0 ? (int)$product['promo_price_minor'] : (int)$product['price_minor']; $line = $unit * $qty; $subtotal += $line;
-            $rows[] = ['venue_id'=>$venueId, 'product_id'=>$productId, 'name_snapshot'=>$product['name'], 'unit_price_minor'=>$unit, 'quantity'=>$qty, 'line_total_minor'=>$line, 'options_snapshot'=>is_array($item['option_ids'] ?? null) ? $item['option_ids'] : [], 'notes'=>substr((string)($item['notes'] ?? ''), 0, 500)];
+            $rows[] = ['venue_id'=>$venueId, 'product_id'=>$productId, 'name_snapshot'=>$product['name'], 'unit_price_minor'=>$unit, 'quantity'=>$qty, 'line_total_minor'=>$line, 'ros_options_snapshot'=>is_array($item['option_ids'] ?? null) ? $item['option_ids'] : [], 'notes'=>substr((string)($item['notes'] ?? ''), 0, 500)];
         }
         $fulfillment = $body['fulfillment'] ?? []; $type = (string)($fulfillment['type'] ?? 'pickup'); if (!in_array($type, ['pickup','delivery'], true)) throw new ApiException(422, 'FULFILLMENT_INVALID', 'Método de entrega no válido.');
         if ($type === 'delivery' && trim((string)($fulfillment['address'] ?? '')) === '') throw new ApiException(422, 'ADDRESS_REQUIRED', 'La dirección es obligatoria para delivery.');
