@@ -1,5 +1,5 @@
 /* Restaurant OS — Mi cuenta: seguimiento de pedidos, perfil y acceso de equipo */
-import { api, toast, modal, fmtMoney, fmtDate, fmtClock, statusBadge, emptyState, esc } from '/assets/ui.js';
+import { api, toast, modal, fmtMoney, fmtDate, fmtClock, statusBadge, emptyState, esc } from './ui.js';
 
 const $ = (s) => document.querySelector(s);
 const el = (id) => document.getElementById(id);

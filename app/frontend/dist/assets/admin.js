@@ -1,5 +1,5 @@
 /* Restaurant OS — panel de negocio (dashboard completo es-PE) */
-import { api, toast, modal, fmtMoney, fmtDate, fmtClock, statusBadge, emptyState, skeletonRows, esc, esPE, elapsedLabel } from '/assets/ui.js';
+import { api, toast, modal, fmtMoney, fmtDate, fmtClock, statusBadge, emptyState, skeletonRows, esc, esPE, elapsedLabel } from './ui.js';
 
 const sectionFromUrl = () => new URL(location.href).searchParams.get('section') || 'hoy';
 const state = { me: null, venue: null, sec: sectionFromUrl(), soundOn: true, orders: [], lastSoundAt: 0 };
