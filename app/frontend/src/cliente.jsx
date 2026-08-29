@@ -32,10 +32,10 @@ function CustomerDashboard() {
     localStorage.removeItem(tokenKey);
     localStorage.removeItem('ros_customer_session');
     fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
-    location.href = '/';
+    location.href = '/carta.html?venue=casa-aurora&section=carta';
   };
 
-  const carta = '/carta.html?venue=casa-aurora';
+  const carta = '/carta.html?venue=casa-aurora&section=carta';
   return <div className="customer-shell foodie-customer">
     <header className="customer-header foodie-customer-header">
       <a className="foodipro-logo" href="/" aria-label="FoodiPro inicio"><span className="logo-tile">✦</span><span>Foodi<span>Pro</span></span></a>

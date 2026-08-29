@@ -35,8 +35,11 @@ function bindShell() {
   $('#user-chip').classList.remove('hide'); $('#user-chip').textContent = `${state.me.user.name} · ${labelRole(state.me.user.role)}`;
   $('#btn-logout').classList.remove('hide');
   $('#btn-store').classList.remove('hide');
-  $('#btn-store').href = `/storefront.html`;
-  $('#btn-logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
+  $('#btn-store').href = `./carta.html?venue=${encodeURIComponent(state.venue?.slug || 'casa-aurora')}`;
+  $('#btn-logout').onclick = async () => {
+    try { await api('/auth/logout', { method: 'POST' }); }
+    finally { location.href = './carta.html?venue=casa-aurora&section=carta'; }
+  };
 }
 
 function labelRole(r) { return { owner: 'Dueño', manager: 'Gerente', kitchen: 'Cocina', cashier: 'Caja', marketing: 'Marketing', viewer: 'Solo lectura', platform_admin: 'Admin plataforma' }[r] || r; }
