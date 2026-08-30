@@ -295,6 +295,8 @@
 .header-account-copy { display: grid; gap: 2px; min-width: 82px; text-align: left; }
 .header-account-copy strong { overflow: hidden; font-size: .78rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .header-account-copy small { overflow: hidden; color: var(--text-tertiary); font-size: .64rem; text-overflow: ellipsis; white-space: nowrap; }
+.auth-promo-copy h1 { letter-spacing: -0.04em; margin: 0 0 22px; font-size: clamp(2.5rem, 4.7vw, 5rem); line-height: .98; }
+.auth-form-content h2 { margin-bottom: 8px; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.04em; }
 .header-account-chevron { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 10px; background: #f7f7f8; color: var(--text-secondary); font-size: 1rem; }
 .customer-account-view .customer-category { border: 1px solid #e5e5e9; cursor: pointer; font: inherit; text-align: left; }
 .customer-account-view .customer-category .generated-food-image { display: block; width: 53px; height: 53px; flex: 0 0 53px; border-radius: 14px; background-color: #fff0e8; background-size: 300% 300%; }
