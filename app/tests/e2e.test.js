@@ -58,11 +58,16 @@ async function login(email, pass, key) {
   assert.ok(r.ok, 'login ' + email + ' → ' + r.status + ' ' + JSON.stringify(r.json));
   return r;
 }
-async function order(customer, items, extra = {}) {
-  const r = await api(`/public/venues/casa-aurora/orders`, { method: 'POST', body: { idempotency_key: randomBytes(8).toString('hex'), customer, fulfillment: { type: 'pickup' }, items, ...extra } });
+async function loginCustomer(key = 'customerC') {
+  const r = await api('/auth/customer-login', { method: 'POST', body: { email: 'cliente@demo.pe', password: 'Demo1234!' }, auth: key });
+  assert.ok(r.ok, 'customer login → ' + r.status + ' ' + JSON.stringify(r.json));
   return r;
 }
-const pay = (token, last4 = '4242') => api(`/public/venues/casa-aurora/orders/${token}/pay`, { method: 'POST', body: { card_last4: last4, card_brand: 'visa' } });
+async function order(customer, items, extra = {}) {
+  const r = await api(`/public/venues/casa-aurora/orders`, { method: 'POST', body: { idempotency_key: randomBytes(8).toString('hex'), customer, fulfillment: { type: 'pickup' }, items, ...extra }, auth: 'customerC' });
+  return r;
+}
+const pay = (token, last4 = '4242') => api(`/public/venues/casa-aurora/orders/${token}/pay`, { method: 'POST', body: { card_last4: last4, card_brand: 'visa' }, auth: 'customerC' });
 
 let menu, promoProd, stockProd, cheapProd, zone;
 
@@ -81,6 +86,7 @@ before(async () => {
   await login('caja@casaaurora.pe', 'Demo1234!', 'cashierC');
   await login('marketing@casaaurora.pe', 'Demo1234!', 'marketingC');
   await login('admin@restaurantos.pe', 'Admin1234!', 'adminC');
+  await loginCustomer();
   const adminProds = await api('/menu/products', { auth: 'ownerCasa' });
   if (!adminProds.ok || !Array.isArray(adminProds.json)) console.error('ADMINPRODS', adminProds.status, JSON.stringify(adminProds.json).slice(0,300));
   stockProd = adminProds.json.find((p) => p.track_stock === 1);
@@ -131,8 +137,8 @@ describe('§39 T2 — Precios server-side (anti-manipulación)', () => {
 describe('§39 T3 — Idempotencia (pedido + pago)', () => {
   test('misma idempotency_key → mismo pedido, sin duplicados', async () => {
     const body = { idempotency_key: 'IDEM-E2E-1', customer: { name: 'T3', phone: '+51999000004' }, fulfillment: { type: 'pickup' }, items: [{ product_id: promoProd.id, quantity: 1 }] };
-    const a = await api('/public/venues/casa-aurora/orders', { method: 'POST', body });
-    const b = await api('/public/venues/casa-aurora/orders', { method: 'POST', body });
+    const a = await api('/public/venues/casa-aurora/orders', { method: 'POST', body, auth: 'customerC' });
+    const b = await api('/public/venues/casa-aurora/orders', { method: 'POST', body, auth: 'customerC' });
     assert.ok(a.ok); assert.ok(b.ok);
     assert.equal(a.json.id, b.json.id, 'mismo pedido');
     assert.equal(a.json.public_token, b.json.public_token, 'mismo token');
@@ -167,7 +173,7 @@ describe('§39 T5 — Entitlements Plus vs Pro', () => {
   test('Starter (La Cantina) no puede crear pedidos', async () => {
     const m = await api('/public/venues/la-cantina/menu');
     const p = m.json.categories.flatMap((c) => c.products)[0];
-    const r = await api('/public/venues/la-cantina/orders', { method: 'POST', body: { idempotency_key: 'X-STARTER', customer: { name: 'T5', phone: '999' }, fulfillment: { type: 'pickup' }, items: [{ product_id: p.id, quantity: 1 }] } });
+    const r = await api('/public/venues/la-cantina/orders', { method: 'POST', body: { idempotency_key: 'X-STARTER', customer: { name: 'T5', phone: '999' }, fulfillment: { type: 'pickup' }, items: [{ product_id: p.id, quantity: 1 }] }, auth: 'customerC' });
     assert.equal(r.status, 403);
     assert.equal(r.json.error.code, 'ORDERS_DISABLED');
   });

@@ -32,7 +32,11 @@ try {
         if (!$rows) throw new ApiException(404, 'VENUE_NOT_FOUND', 'No encontramos este negocio.'); respond($rows[0]);
     }
     if ($method === 'POST' && preg_match('#^/api/v1/public/venues/([^/]+)/orders$#', $path, $m)) {
-        $body = json_body(); $slug = rawurldecode($m[1]); $venues = $db->query('ros_venues', ['slug' => 'eq.' . rawurlencode($slug), 'status' => 'eq.active', 'select' => 'id,name,slug,currency', 'limit' => '1']);
+        $user = require_customer($db);
+        $body = json_body(); $body['customer'] = is_array($body['customer'] ?? null) ? $body['customer'] : [];
+        $body['customer']['email'] = $user['email'] ?? null;
+        $body['customer']['name'] = $user['name'] ?? ($body['customer']['name'] ?? 'Cliente');
+        $slug = rawurldecode($m[1]); $venues = $db->query('ros_venues', ['slug' => 'eq.' . rawurlencode($slug), 'status' => 'eq.active', 'select' => 'id,name,slug,currency', 'limit' => '1']);
         if (!$venues) throw new ApiException(404, 'VENUE_NOT_FOUND', 'No encontramos este negocio.');
         $items = $body['items'] ?? null; if (!is_array($items) || count($items) < 1 || count($items) > 50) throw new ApiException(422, 'ITEMS_INVALID', 'El pedido debe tener entre 1 y 50 productos.');
         $venueId = (string)$venues[0]['id']; $idempotency = trim((string)($body['idempotency_key'] ?? ''));
@@ -61,6 +65,7 @@ try {
         $order['totals'] = ['subtotal_minor'=>$subtotal, 'tax_minor'=>$tax, 'delivery_fee_minor'=>$fee, 'total_minor'=>$total]; respond($order, 201);
     }
     if ($method === 'POST' && preg_match('#^/api/v1/public/venues/([^/]+)/orders/([^/]+)/pay$#', $path, $m)) {
+        require_customer($db);
         $body = json_body(); $methodName = strtolower(trim((string)($body['payment_method'] ?? '')));
         if (!in_array($methodName, ['yape','plin'], true)) throw new ApiException(422, 'PAYMENT_METHOD_INVALID', 'Selecciona Yape o Plin.');
         $operation = trim((string)($body['operation_code'] ?? '')); if ($operation === '' || strlen($operation) > 80) throw new ApiException(422, 'OPERATION_CODE_REQUIRED', 'Ingresa el código de operación.');
@@ -79,7 +84,9 @@ try {
         // $_COOKIE during this request. Seed the request view so session_user()
         // can validate the freshly-issued token before responding.
         $_COOKIE['ros_access_token'] = $access;
-        $user = session_user($db); if (!$user) throw new ApiException(403, 'NO_VENUE_ACCESS', 'Tu cuenta no tiene un restaurante activo asignado.');
+        $user = session_user($db);
+        if (($user['role'] ?? '') === 'customer') throw new ApiException(403, 'CUSTOMER_LOGIN_REQUIRED', 'Usa el acceso cliente para continuar.');
+        if (!$user) throw new ApiException(403, 'NO_VENUE_ACCESS', 'Tu cuenta no tiene un restaurante activo asignado.');
         $_SESSION['csrf'] = bin2hex(random_bytes(32)); respond(['user' => $user, 'csrf_token' => $_SESSION['csrf']]);
     }
     if ($method === 'POST' && $path === '/api/v1/auth/customer-login') {

@@ -251,6 +251,25 @@
 @keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .checkout-panel { animation: none; } }
 
+.workspace-page-cuenta .customer-workspace-banner, .workspace-page-cuenta .menu-intro, .workspace-page-cuenta .carta-promo, .workspace-page-cuenta .category-section, .workspace-page-cuenta .products-section, .workspace-page-cuenta .foodie-right-rail { display: none; }
+.workspace-page-cuenta .foodie-layout { grid-template-columns: 76px minmax(0, 1fr); }
+.account-section { display: grid; gap: 22px; padding: 6px 0 40px; }
+.account-intro { padding: 20px 8px 4px; }
+.account-intro h1 { max-width: 680px; margin: 0 0 16px; font-size: clamp(2.8rem, 6vw, 5.7rem); line-height: .9; letter-spacing: -.085em; }
+.account-intro h1 em { color: var(--accent-primary); font-style: normal; }
+.account-intro > p:last-child { max-width: 560px; color: var(--text-secondary); font-size: 1rem; line-height: 1.6; }
+.account-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .8fr); gap: 20px; }
+.account-card { display: grid; gap: 18px; min-height: 190px; padding: 28px; border: 1px solid rgba(20,22,28,.05); border-radius: 24px; background: var(--surface-primary); box-shadow: var(--shadow-soft); }
+.account-profile-card { grid-template-columns: auto 1fr; align-items: center; }
+.account-card small { color: var(--text-tertiary); font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.account-card h2 { margin: 4px 0 6px; font-size: clamp(1.35rem, 2vw, 2rem); letter-spacing: -.05em; }
+.account-card p { margin: 0; color: var(--text-secondary); line-height: 1.55; }
+.account-avatar { display: grid; place-items: center; width: 76px; height: 76px; border-radius: 24px; background: #ffe8eb; color: var(--accent-primary); }
+.account-card:not(.account-profile-card) { align-content: start; }
+.account-card:not(.account-profile-card) button { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 13px 0; border-bottom: 1px solid var(--border-subtle); background: transparent; color: var(--text-primary); font-weight: 750; text-align: left; }
+.account-card:not(.account-profile-card) button:hover, .account-card:not(.account-profile-card) button:focus-visible { color: var(--accent-primary); outline: 0; }
+@media (max-width: 700px) { .workspace-page-cuenta .foodie-layout { display: block; }.account-grid { grid-template-columns: 1fr; }.account-card { padding: 22px; border-radius: 20px; }.account-intro { padding-inline: 3px; } }
+
 /* Inicio: dashboard del comensal con la composición del adjunto. */
 .inicio-module-link { display: inline-flex; align-items: center; gap: 8px; margin: -8px 0 12px 96px; padding: 8px 13px; border-radius: 999px; color: var(--accent-primary); background: var(--accent-soft); font-size: .76rem; font-weight: 800; text-decoration: none; }
 .inicio-module-link:hover, .inicio-module-link:focus-visible { color: #fff; background: var(--accent-primary); outline: 3px solid rgba(223,24,51,.18); outline-offset: 2px; }

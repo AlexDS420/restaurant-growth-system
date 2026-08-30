@@ -59,6 +59,7 @@ export function registerAppRoutes(app) {
       const u = db.prepare('SELECT * FROM users WHERE email = ?').get(String(b.email || '').toLowerCase());
       if (!u || !verifyPassword(String(b.password || ''), u.password_hash)) return sendError(res, 401, 'INVALID_CREDENTIALS', 'Correo o contraseña incorrectos.');
       if (!u.active) return sendError(res, 403, 'ACCOUNT_DISABLED', 'Tu cuenta está desactivada. Contacta al soporte.');
+      if (u.role === 'customer') return sendError(res, 403, 'CUSTOMER_LOGIN_REQUIRED', 'Usa el acceso cliente para continuar.');
       const token = createSession(db, u.id);
       db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(nowISO(), u.id);
       res.setHeader('Set-Cookie', sessionCookie(token));

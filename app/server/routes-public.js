@@ -1,5 +1,5 @@
 // Restaurant OS — rutas públicas (storefront, checkout, reseñas, reservas, review redirect)
-import { sendOk, sendError } from './auth.js';
+import { sendOk, sendError, requireAuth } from './auth.js';
 import { createOrder, getOrderPublic, payOrder, submitReview, publicVenue, publicMenu, normalizePhone, apiError, errToHttp, apiMetrics } from './orders.js';
 import { feature } from './entitlements.js';
 import { enqueueOutbox } from './notifications.js';
@@ -9,6 +9,12 @@ import { withTxn, nowISO } from './db.js';
 
 export function registerPublicRoutes(app) {
   const { db } = app;
+  // La carta y el estado de un pedido son públicos; crear/pagar pedidos no.
+  // Un usuario de restaurante nunca puede usar estas rutas como cliente.
+  const customerAuth = [requireAuth(db), (req, res, next) => {
+    if (req.user.role !== 'customer') return sendError(res, 403, 'CUSTOMER_ACCESS_REQUIRED', 'Inicia sesión con una cuenta de cliente para hacer pedidos.');
+    next();
+  }];
 
   // negocio público + estado
   app.get('/api/v1/public/venues/:slug', (req, res) => {
@@ -38,11 +44,13 @@ export function registerPublicRoutes(app) {
     } catch (e) { const h = errToHttp(e); sendError(res, h.status, h.code, h.message); }
   });
 
-  // crear pedido (guest allowed; server calcula todo)
-  app.post('/api/v1/public/venues/:slug/orders', async (req, res) => {
+  // crear pedido (solo cliente registrado; server calcula todo)
+  app.post('/api/v1/public/venues/:slug/orders', customerAuth, async (req, res) => {
     apiMetrics.orderCount++;
     try {
-      const out = await createOrder(db, { slug: req.params.slug, body: req.body, ip: req.ip });
+      // La identidad de la cuenta prevalece sobre cualquier email enviado por el navegador.
+      const body = { ...req.body, customer: { ...(req.body?.customer || {}), email: req.user.email, name: req.user.name || req.body?.customer?.name || 'Cliente' } };
+      const out = await createOrder(db, { slug: req.params.slug, body, ip: req.ip, actor: req.user });
       const status = out.duplicated ? 200 : 201;
       sendOk(res, { ...out.order, duplicated: out.duplicated }, status);
     } catch (e) {
@@ -60,7 +68,7 @@ export function registerPublicRoutes(app) {
   });
 
   // pago (mock; anti doble cargo; declina con 0001, outage con 9999)
-  app.post('/api/v1/public/venues/:slug/orders/:publicToken/pay', async (req, res) => {
+  app.post('/api/v1/public/venues/:slug/orders/:publicToken/pay', customerAuth, async (req, res) => {
     try {
       const v = db.prepare('SELECT id FROM venues WHERE slug = ?').get(req.params.slug);
       if (!v) return sendError(res, 404, 'VENUE_NOT_FOUND', 'Negocio no encontrado.');

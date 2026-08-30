@@ -140,6 +140,12 @@ function session_user(SupabaseRest $db): ?array
     return ['id' => $id, 'email' => $auth['email'] ?? '', 'name' => $auth['user_metadata']['name'] ?? ($auth['email'] ?? ''), 'role' => $members[0]['role'], 'venue_id' => $ros_venues[0]['id'] ?? null, 'active' => true];
 }
 function require_session(SupabaseRest $db): array { $user = session_user($db); if (!$user) throw new ApiException(401, 'UNAUTHENTICATED', 'Inicia sesión para continuar.'); return $user; }
+function require_customer(SupabaseRest $db): array
+{
+    $user = require_session($db);
+    if (($user['role'] ?? '') !== 'customer') throw new ApiException(403, 'CUSTOMER_ACCESS_REQUIRED', 'Inicia sesión con una cuenta de cliente para hacer pedidos.');
+    return $user;
+}
 function require_role(SupabaseRest $db, array $roles): array
 {
     $user = require_session($db);
