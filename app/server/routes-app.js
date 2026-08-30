@@ -747,7 +747,9 @@ export function registerAppRoutes(app) {
 // ---------- helpers ----------
 function venueBrief(db, vid) {
   const v = db.prepare('SELECT id, name, slug FROM venues WHERE id = ?').get(vid);
-  return v || null;
+  if (!v) return null;
+  const sub = db.prepare("SELECT plan_id, status FROM subscriptions WHERE venue_id = ? ORDER BY id DESC LIMIT 1").get(vid);
+  return { ...v, plan: sub?.plan_id || 'starter', subscription_status: sub?.status || 'inactive' };
 }
 function spotlight(v) {
   const { opening_hours_json, updated_at, ...rest } = v;
