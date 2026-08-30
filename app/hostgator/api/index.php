@@ -65,11 +65,15 @@ try {
         $order['totals'] = ['subtotal_minor'=>$subtotal, 'tax_minor'=>$tax, 'delivery_fee_minor'=>$fee, 'total_minor'=>$total]; respond($order, 201);
     }
     if ($method === 'POST' && preg_match('#^/api/v1/public/venues/([^/]+)/orders/([^/]+)/pay$#', $path, $m)) {
-        require_customer($db);
+        $user = require_customer($db);
+        $slug = rawurldecode($m[1]);
+        $venues = $db->query('ros_venues', ['slug' => 'eq.' . rawurlencode($slug), 'status' => 'eq.active', 'select' => 'id', 'limit' => '1']);
+        if (!$venues) throw new ApiException(404, 'VENUE_NOT_FOUND', 'No encontramos este negocio.');
+        $venueId = (string)$venues[0]['id'];
         $body = json_body(); $methodName = strtolower(trim((string)($body['payment_method'] ?? '')));
         if (!in_array($methodName, ['yape','plin'], true)) throw new ApiException(422, 'PAYMENT_METHOD_INVALID', 'Selecciona Yape o Plin.');
         $operation = trim((string)($body['operation_code'] ?? '')); if ($operation === '' || strlen($operation) > 80) throw new ApiException(422, 'OPERATION_CODE_REQUIRED', 'Ingresa el código de operación.');
-        $orders = $db->query('ros_orders', ['public_token' => 'eq.' . rawurlencode($m[2]), 'select' => 'id,venue_id,total_minor,payment_status', 'limit' => '1']); if (!$orders) throw new ApiException(404, 'ORDER_NOT_FOUND', 'Pedido no encontrado.'); $order = $orders[0];
+        $orders = $db->query('ros_orders', ['public_token' => 'eq.' . rawurlencode($m[2]), 'venue_id' => 'eq.' . rawurlencode($venueId), 'customer_email' => 'eq.' . rawurlencode((string)($user['email'] ?? '')), 'select' => 'id,venue_id,total_minor,payment_status', 'limit' => '1']); if (!$orders) throw new ApiException(404, 'ORDER_NOT_FOUND', 'Pedido no encontrado.'); $order = $orders[0];
         if (($order['payment_status'] ?? '') === 'paid') throw new ApiException(409, 'PAYMENT_ALREADY_PROCESSED', 'Este pedido ya figura como pagado.');
         $payment = $db->insert('ros_payments', ['order_id' => $order['id'], 'venue_id' => $order['venue_id'], 'method' => $methodName, 'provider' => $methodName, 'amount_minor' => (int)$order['total_minor'], 'status' => 'verifying', 'operation_code' => $operation, 'external_ref' => $operation]);
         respond(['payment' => $payment[0] ?? $payment, 'payment_status' => 'pending_verification', 'message' => 'Pago recibido para verificación del negocio.'], 201);

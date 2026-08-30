@@ -100,6 +100,7 @@ export function registerAppRoutes(app) {
   app.get('/api/v1/me/orders', requireAuth(db), (req, res) => {
     try {
       const u = req.user;
+      if (u.role !== 'customer') return sendError(res, 403, 'CUSTOMER_ACCESS_REQUIRED', 'Esta vista está disponible para cuentas de cliente.');
       const rows = db.prepare(`
         SELECT o.id, o.order_number, o.status, o.payment_status, o.fulfillment_type, o.total_minor, o.placed_at, o.public_token
         FROM orders o JOIN customers c ON c.id = o.customer_id

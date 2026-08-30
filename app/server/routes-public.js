@@ -74,7 +74,9 @@ export function registerPublicRoutes(app) {
       if (!v) return sendError(res, 404, 'VENUE_NOT_FOUND', 'Negocio no encontrado.');
       if (!feature(db, v.id, 'payments.online.enabled')) return sendError(res, 403, 'PAYMENTS_DISABLED', 'El pago en línea no está disponible en tu plan.');
       const body = req.body || {};
-      const out = await payOrder(db, { venueId: v.id, publicToken: req.params.publicToken, cardLast4: String(body.card_last4 || '').slice(-4), cardBrand: body.card_brand || 'visa', paymentMethodId: body.payment_method_id, ip: req.ip });
+        const owned = db.prepare('SELECT id FROM orders WHERE venue_id = ? AND public_token = ? AND customer_email = ?').get(v.id, req.params.publicToken, req.user.email);
+        if (!owned) return sendError(res, 403, 'ORDER_ACCESS_DENIED', 'Este pedido no pertenece a tu cuenta de cliente.');
+        const out = await payOrder(db, { venueId: v.id, publicToken: req.params.publicToken, cardLast4: String(body.card_last4 || '').slice(-4), cardBrand: body.card_brand || 'visa', paymentMethodId: body.payment_method_id, ip: req.ip });
       sendOk(res, out, out.payment_status === 'requires_action' || out.payment_status === 'requires_confirmation' ? 202 : 200);
     } catch (e) {
       const h = { ...errToHttp(e), order: e.order };
