@@ -116,7 +116,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 
 @keyframes tin { from { opacity: 0; transform: translateY(8px); } }
 .modal-back { position: fixed; inset: 0; background: rgba(8,21,16,.58); z-index: 90; display: flex; align-items: center; justify-content: center; padding: var(--sp-4); animation: fin .18s ease; overscroll-behavior: contain; }
 @keyframes fin { from { opacity: 0; } }
-.modal { background: var(--surface); border-radius: 20px; max-width: 560px; width: 100%; max-height: 88vh; overflow: auto; padding: var(--sp-6); position: relative; border-top: 5px solid var(--accent); box-shadow: 0 30px 80px -35px #000; }
+.modal { background: var(--surface); border-radius: 20px; max-width: 560px; width: 100%; max-height: 88vh; overflow: auto; padding: var(--sp-6); position: relative; box-shadow: 0 30px 80px -35px #000; }
 .modal h3 { margin-bottom: var(--sp-3); }
 
 /* helper */

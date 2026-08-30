@@ -62,6 +62,7 @@ const NAV_ICONS = {
 function navHtml() {
   return `<div class="sidebar-admin"><nav class="sidebar" aria-label="Navegación">
     <div class="sidebar-group"><span class="sidebar-group-label">Operación</span>${SECTIONS.filter(([id]) => state.me.user.permissions.includes(PERM[id])).map(([id, label]) => `<a href="?section=${id}" data-sec="${id}" ${state.sec === id ? 'class="active" aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${NAV_ICONS[id] || '<circle cx="12" cy="12" r="3"/>'}</svg></span><span>${label}</span></a>`).join('')}</div>
+    <div class="sidebar-bottom"><div class="sidebar-utilities"><button type="button" id="sidebar-help"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-1 .7-1.7 1.1-1.7 2.7M12 17h.01"/></svg></span><span>Centro de ayuda</span></button></div><div class="sidebar-profile"><span class="sidebar-profile-avatar">${esc((state.me.user.name || 'RO').slice(0, 2).toUpperCase())}</span><span class="sidebar-profile-copy"><strong>${esc(state.me.user.name)}</strong><small>${esc(labelRole(state.me.user.role))}</small></span><button type="button" id="sidebar-logout" aria-label="Cerrar sesión"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M21 19V5a2 2 0 0 0-2-2h-4M15 21h4a2 2 0 0 0 2-2"/></svg></button></div></div>
   </nav><main class="main" id="main"></main></div>`;
 }
 // Fallback de accesibilidad para formularios renderizados dinámicamente:
@@ -85,6 +86,8 @@ function go(sec, { replace = false } = {}) {
   history[replace ? 'replaceState' : 'pushState']({ section: sec }, '', url);
   $('#view').innerHTML = navHtml();
   $('#view').querySelectorAll('[data-sec]').forEach((a) => a.onclick = (e) => { e.preventDefault(); go(a.dataset.sec); });
+  el('sidebar-logout').onclick = $('#btn-logout').onclick;
+  el('sidebar-help').onclick = () => toast('El Centro de ayuda estará disponible próximamente.', '');
   const fn = { hoy: rHoy, pedidos: rPedidos, comanda: rComanda, menu: rMenu, inventario: rInventario, clientes: rClientes, reservas: rReservas, reseñas: rReseñas, analitica: rAnalitica, promociones: rPromos, cupones: rCupones, facturacion: rBilling, equipo: rEquipo, auditoria: rAuditoria, config: rConfig }[sec];
   fn?.().then(() => enhanceFormControls()).catch((e) => {
     if (e.code === 'FORBIDDEN' || e.code === 'AUTH_REQUIRED') { go('hoy', { replace: true }); return; }
@@ -259,8 +262,8 @@ async function rMenu() {
     <td><span style="margin-right:6px">${p.emoji || '🍽️'}</span><strong>${esc(p.name)}</strong><div class="muted" style="font-size:12px">${esc(p.description || '').slice(0, 60)}</div></td>
     <td>${esc(p.category_name)}</td><td class="num">${fmtMoney(p.price_minor)}${p.promo_price_minor ? `<div class="muted" style="font-size:12px">Oferta ${fmtMoney(p.promo_price_minor)}</div>` : ''}</td>
     <td class="num">${p.track_stock ? p.stock_quantity : '—'}</td>
-    <td>${p.is_available ? '<span class="badge ok">Disponible</span>' : '<span class="badge err">Agotado</span>'} ${p.is_visible ? '' : '<span class="badge">Oculto</span>'}</td>
-    <td><div class="actions"><button class="btn btn-ghost btn-sm" data-edit="${p.id}">Editar</button>${p.track_stock ? `<button class="btn btn-ghost btn-sm" data-stock="${p.id}">Stock</button>` : ''}<button class="btn btn-danger btn-sm" data-del="${p.id}">Eliminar</button></div></td></tr>`).join('')
+    <td>${p.is_available && Number(p.stock_quantity) > 0 ? '<span class="badge ok">Disponible</span>' : '<span class="badge err">Agotado</span>'} ${p.is_visible ? '' : '<span class="badge">Oculto</span>'}</td>
+    <td><div class="actions"><button class="btn btn-ghost btn-sm" data-edit="${p.id}">Editar</button><button class="btn btn-ghost btn-sm stock-action" data-stock="${p.id}" ${p.track_stock && Number(p.stock_quantity) > 0 ? '' : 'disabled'} title="${p.track_stock && Number(p.stock_quantity) > 0 ? 'Ajustar stock' : 'Edita el stock para habilitar esta acción'}">Stock</button><button class="btn btn-danger btn-sm" data-del="${p.id}">Eliminar</button></div></td></tr>`).join('')
     : `<tr><td colspan="6">${emptyState('📋', esPE.empty.menu)}</td></tr>`;
   el('np').onclick = () => productForm();
   el('nc').onclick = () => catForm();

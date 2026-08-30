@@ -11,6 +11,12 @@
     <script type="module" crossorigin src="/assets/admin.js"></script>
   </head>
   <body>
+    <script>
+      // Compatibilidad con enlaces antiguos: el acceso único del restaurante
+      // es admin.html; no mantenemos un segundo panel operativo.
+      location.replace('./admin.html');
+    </script>
+    <noscript><meta http-equiv="refresh" content="0;url=./admin.html" /></noscript>
     <a class="skip-link" href="#main">Saltar al contenido</a>
     <header class="nav"><div class="nav-inner">
       <a class="brand" href="./">Foodi<span>Pro</span></a><span class="nav-spacer"></span>
